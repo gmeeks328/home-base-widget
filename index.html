@@ -101,6 +101,28 @@
 
   .stamp.off { display: none; }
   .stamp { margin-top: 6px; padding-right: 40px; font-size: 10px; color: var(--ink-faint); font-family: var(--font-num); display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+
+  /* Radar tab: hides the forecast strip and timestamp so the map gets the room. Leaflet is loaded only when this tab is opened. */
+  body.radar .wx, body.radar .stamp { display: none; }
+  body.radar .list { background: none; border: none; }
+  .rwrap { position: relative; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); background: var(--surface-2); }
+  .rmap { position: absolute; inset: 0; }
+  .rwrap .anchor { background: none; border: none; }
+  .rhome { position: absolute; left: 0; top: 0; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 3px; }
+  .rhome i { display: block; width: 13px; height: 13px; border-radius: 50%; background: #2F6FD0; border: 3px solid #fff; box-shadow: 0 0 0 1.5px #2F6FD0, 0 2px 6px rgba(0,0,0,0.25); }
+  .rhome b { padding: 1px 7px; border-radius: 8px; background: #2F6FD0; color: #fff; font-size: 10.5px; font-weight: 700; white-space: nowrap; }
+  .rlegend { position: absolute; z-index: 800; top: 6px; right: 6px; padding: 3px 7px; border-radius: 100px; background: rgba(255,255,255,0.94); border: 1px solid rgba(0,0,0,0.12); font-size: 9.5px; color: #555; display: flex; align-items: center; gap: 4px; }
+  .rlegend i { display: block; width: 38px; height: 5px; border-radius: 3px; background: linear-gradient(90deg, #3aa845, #f0e030, #f08020, #d02020, #b020a0); }
+  .rbar { position: absolute; z-index: 800; left: 6px; right: 6px; bottom: 6px; display: flex; align-items: center; gap: 6px; padding: 4px; border-radius: 100px; background: rgba(255,255,255,0.95); border: 1px solid rgba(0,0,0,0.12); color: #1d2a27; }
+  .rstep { flex: 0 0 auto; width: 40px; height: 30px; display: flex; align-items: center; justify-content: center; border-radius: 100px; border: 1px solid rgba(0,0,0,0.12); color: #2F6E62; font-size: 16px; font-weight: 700; text-decoration: none;
+    --wweb2-overlay-btn-color: rgba(0, 0, 0, 0);
+    --wweb2-overlay-btn-press-color: rgba(47, 110, 98, 0.25);
+    --wweb2-overlay-btn-corner-radius: 100px; }
+  .rstep.off { opacity: 0.3; }
+  .rwhen { flex: 1; text-align: center; line-height: 1.1; }
+  .rwhen b { display: block; font-size: 13.5px; font-variant-numeric: tabular-nums; }
+  .rwhen small { font-size: 10px; color: #666; }
+  .rcredit { position: absolute; z-index: 700; right: 8px; bottom: 46px; font-size: 7.5px; color: #555; background: rgba(255,255,255,0.7); padding: 0 3px; border-radius: 3px; }
 </style>
 
 <div class="wrap">
@@ -161,6 +183,7 @@
   <nav class="tabs" aria-label="Views">
     <a class="tab" id="tab-schedule" href="#schedule">Schedule</a>
     <a class="tab" id="tab-inbox" href="#inbox">Inbox</a>
+    <a class="tab" id="tab-radar" href="#radar">Radar</a>
   </nav>
 
   <main class="list" id="view"></main>
@@ -312,12 +335,149 @@
 
   function overflows() { return document.documentElement.scrollHeight > window.innerHeight + 1; }
 
+
+  // ---- Radar tab (same map as radar-widget.html: Esri topographic with boosted greens, RainViewer radar, hash picks the frame) ----
+  var RADAR = { home: [32.386, -96.848], name: "Waxahachie", zoom: 8, feed: null, map: null, pending: 0, loading: false };
+  var radarPending = false;
+  function loadScript(src, cb) { var s = document.createElement("script"); s.src = src; s.onload = function () { cb(); }; s.onerror = function () { cb(new Error("script")); }; document.head.appendChild(s); }
+  function ensureLeaflet(cb) {
+    if (window.L) return cb();
+    var l = document.createElement("link"); l.rel = "stylesheet"; l.href = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css"; document.head.appendChild(l);
+    loadScript("https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js", function (e) { cb(e); });
+  }
+  function radarFrame() { var m = /^radar(\d*)$/.exec((window.location.hash || "").replace("#", "")); return m && m[1] ? parseInt(m[1], 10) : 0; }
+
+  function renderRadar(view) {
+    document.body.classList.add("radar");
+    view.innerHTML = '<div class="rwrap" id="rwrap"><div class="rmap" id="rmap"></div><div class="rlegend"><span>light</span><i></i><span>heavy</span></div><div class="rcredit">Esri | RainViewer</div>' +
+      '<div class="rbar"><a class="rstep off" id="rOlder" aria-label="Earlier frame">&#9664;</a><div class="rwhen"><b id="rClock">--</b><small id="rRel">loading radar</small></div><a class="rstep off" id="rNewer" aria-label="Later frame">&#9654;</a></div></div>';
+    var wrap = document.getElementById("rwrap");
+    wrap.style.height = Math.max(200, window.innerHeight - wrap.getBoundingClientRect().top - 10) + "px";
+    radarPending = true;
+    ensureLeaflet(function (err) {
+      if (err || !window.L) { document.getElementById("rRel").textContent = "map unavailable"; radarPending = false; return; }
+      startRadarMap();
+    });
+  }
+
+  function startRadarMap() {
+    var L = window.L;
+    if (RADAR.map) { try { RADAR.map.remove(); } catch (e) {} RADAR.map = null; }
+    var map = L.map("rmap", { center: RADAR.home, zoom: RADAR.zoom, zoomControl: false, attributionControl: false, dragging: false, touchZoom: false, scrollWheelZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false });
+    RADAR.map = map;
+    map.createPane("base").style.zIndex = 150;
+    var SERVICES = "https://server.arcgisonline.com/ArcGIS/rest/services/";
+    function applyBaseFilter() { map.getPane("base").style.filter = recolorOk ? "none" : "saturate(1.25)"; }
+  var recolorOk = true;
+  var GREEN_BOOST = 3.4;   // raise for richer greens, lower for paler
+  function rgb2hsl(r, g, b) {
+    r /= 255; g /= 255; b /= 255;
+    var mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2, h = 0, s = 0, d = mx - mn;
+    if (d) {
+      s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
+      if (mx === r) h = (g - b) / d + (g < b ? 6 : 0);
+      else if (mx === g) h = (b - r) / d + 2;
+      else h = (r - g) / d + 4;
+      h *= 60;
+    }
+    return [h, s, l];
+  }
+  function hsl2rgb(h, s, l) {
+    var c = (1 - Math.abs(2 * l - 1)) * s, hp = h / 60, x = c * (1 - Math.abs(hp % 2 - 1)), r = 0, g = 0, b = 0;
+    if (hp < 1) { r = c; g = x; } else if (hp < 2) { r = x; g = c; } else if (hp < 3) { g = c; b = x; }
+    else if (hp < 4) { g = x; b = c; } else if (hp < 5) { r = x; b = c; } else { r = c; b = x; }
+    var m = l - c / 2;
+    return [Math.round((r + m) * 255), Math.round((g + m) * 255), Math.round((b + m) * 255)];
+  }
+  function recolor(px) {
+    for (var i = 0; i < px.length; i += 4) {
+      if (px[i + 3] === 0) continue;
+      var hsl = rgb2hsl(px[i], px[i + 1], px[i + 2]), h = hsl[0], s = hsl[1], l = hsl[2];
+      // Only vegetation greens are touched; water, roads, land tan and text keep Esri's own colors.
+      if (h < 55 || h > 170 || s < 0.05) continue;
+      s = Math.min(0.7, s * GREEN_BOOST + 0.14); h = h + (112 - h) * 0.5; l = l * 0.93;
+      var c = hsl2rgb(h, s, l);
+      px[i] = c[0]; px[i + 1] = c[1]; px[i + 2] = c[2];
+    }
+  }
+  var RecolorTerrain = L.GridLayer.extend({
+    createTile: function (coords, done) {
+      var size = this.getTileSize();
+      var tile = L.DomUtil.create("canvas", "leaflet-tile");
+      tile.width = size.x; tile.height = size.y;
+      var url = L.Util.template(SERVICES + "World_Topo_Map/MapServer/tile/{z}/{y}/{x}", coords);
+      function paint(img, canRecolor) {
+        var ctx = tile.getContext("2d");
+        ctx.drawImage(img, 0, 0, size.x, size.y);
+        if (canRecolor) {
+          try {
+            var data = ctx.getImageData(0, 0, size.x, size.y);
+            recolor(data.data);
+            ctx.putImageData(data, 0, 0);
+          } catch (e) { recolorOk = false; applyBaseFilter(); }
+        }
+        done(null, tile);
+      }
+      function load(cors) {
+        var img = new Image();
+        if (cors) img.crossOrigin = "anonymous";
+        img.onload = function () { paint(img, cors); };
+        img.onerror = function () {
+          if (cors) { recolorOk = false; applyBaseFilter(); load(false); } else { done(new Error("tile"), tile); }
+        };
+        img.src = url;
+      }
+      load(true);
+      return tile;
+    }
+  });
+
+
+    function track(layer) {
+      layer.on("loading", function () { RADAR.pending++; });
+      layer.on("load", function () { RADAR.pending = Math.max(0, RADAR.pending - 1); });
+      return layer;
+    }
+    track(new RecolorTerrain({ pane: "base", maxZoom: 19 })).addTo(map);
+    L.marker(RADAR.home, { icon: L.divIcon({ className: "anchor", html: '<div class="rhome"><i></i><b>' + RADAR.name + '</b></div>', iconSize: [0, 0] }), interactive: false, zIndexOffset: 1000 }).addTo(map);
+
+    function setStep(el, idx, max) {
+      if (idx >= 0 && idx <= max) { el.href = "#radar" + (idx || ""); el.classList.remove("off"); }
+      else { el.removeAttribute("href"); el.classList.add("off"); }
+    }
+    function draw(past, host, scheme) {
+      var n = Math.min(radarFrame(), past.length - 1), f = past[past.length - 1 - n];
+      var layer = track(L.tileLayer(host + f.path + "/256/{z}/{x}/{y}/" + scheme + "/1_1.png", { opacity: 0.85, maxNativeZoom: 7, maxZoom: 10, zIndex: 400 }));
+      var ok = 0, bad = 0;
+      layer.on("tileload", function () { ok++; });
+      layer.on("tileerror", function () { bad++; if (!ok && bad >= 6 && scheme !== 2) { map.removeLayer(layer); draw(past, host, 2); } });
+      layer.addTo(map);
+      document.querySelector(".rlegend").style.display = scheme === 6 ? "" : "none";
+      document.getElementById("rClock").textContent = new Date(f.time * 1000).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+      document.getElementById("rRel").textContent = Math.max(0, Math.round((Date.now() / 1000 - f.time) / 60)) + " min ago";
+      setStep(document.getElementById("rOlder"), n + 1, past.length - 1);
+      setStep(document.getElementById("rNewer"), n - 1, past.length - 1);
+    }
+    function withFeed(cb) {
+      if (RADAR.feed) return cb(RADAR.feed);
+      fetch("https://api.rainviewer.com/public/weather-maps.json", { cache: "no-store" })
+        .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+        .then(function (j) { RADAR.feed = { past: (j.radar && j.radar.past) || [], host: j.host || "https://tilecache.rainviewer.com" }; if (!RADAR.feed.past.length) throw new Error("none"); cb(RADAR.feed); })
+        .catch(function () { var r = document.getElementById("rRel"); if (r) r.textContent = "radar unavailable"; radarPending = false; });
+    }
+    withFeed(function (f) { draw(f.past, f.host, 6); radarPending = false; });
+  }
+
   function setView(name) {
-    if (name !== "inbox") name = "schedule";
+    var isRadar = /^radar\d*$/.test(name);
+    if (isRadar) name = "radar"; else if (name !== "inbox") name = "schedule";
     var view = document.getElementById("view");
     var stamp = document.querySelector(".stamp");
     stamp.classList.remove("off");
-    if (name === "inbox") {
+    if (!isRadar) { document.body.classList.remove("radar"); if (RADAR.map) { try { RADAR.map.remove(); } catch (e) {} RADAR.map = null; } }
+    if (isRadar) {
+      renderRadar(view);
+    } else if (name === "inbox") {
       view.innerHTML = renderInbox();
     } else {
       // Show as many upcoming days as the widget height allows.
@@ -326,12 +486,12 @@
         if (!overflows()) break;
       }
     }
-    if (overflows()) stamp.classList.add("off");
-    ["schedule", "inbox"].forEach(function (n) {
+    if (!isRadar && overflows()) stamp.classList.add("off");
+    ["schedule", "inbox", "radar"].forEach(function (n) {
       var tab = document.getElementById("tab-" + n);
       if (n === name) tab.setAttribute("aria-current", "page"); else tab.removeAttribute("aria-current");
     });
-    setCookie("hb_view", name);
+    setCookie("hb_view", name === "radar" ? "schedule" : name);
   }
 
   // Tabs are plain <a href="#name"> so the widget can load them by URL (the hash is ignored by its cache).
@@ -344,7 +504,8 @@
 
   var hash = (window.location.hash || "").replace("#", "");
   renderWx();
-  setView(hash === "inbox" || hash === "schedule" ? hash : (getCookie("hb_view") || "schedule"));
+  setView(hash === "inbox" || hash === "schedule" || /^radar\d*$/.test(hash) ? hash : (getCookie("hb_view") || "schedule"));
+  window.addEventListener("hashchange", function () { var h = (window.location.hash || "").replace("#", ""); if (/^radar\d*$/.test(h)) setView(h); });
   loadLiveWeather();
 
   document.getElementById("todayStamp").textContent = DAYS[now.getDay()] + " " + MONTHS[now.getMonth()] + " " + now.getDate();
@@ -352,5 +513,9 @@
 
   // WidgetWeb hooks: wait a little longer only while the live forecast is still loading.
   function __wweb2JsWidgetTitle() { return "Home Base"; }
-  function __wweb2WaitMillisecondsToWidgetIsReady(currentDelayMs) { return wxPending ? 600 : 0; }
+  function __wweb2WaitMillisecondsToWidgetIsReady(currentDelayMs) {
+    if (currentDelayMs > 8000) return 0;
+    if (document.body.classList.contains("radar")) return (radarPending || RADAR.pending > 0) ? 500 : 400;
+    return wxPending ? 600 : 0;
+  }
 </script>
