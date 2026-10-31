@@ -147,8 +147,8 @@
   .city.t3 { font-size: 10.5px; color: var(--ink-muted); font-weight: 500; }
 
   .home { position: absolute; left: 0; top: 0; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 3px; pointer-events: none; }
-  .home i { display: block; width: 16px; height: 16px; border-radius: 50%; background: var(--accent); border: 3px solid var(--surface); box-shadow: 0 0 0 1.5px var(--accent), 0 2px 6px rgba(0,0,0,0.25); }
-  .home b { padding: 2px 8px; border-radius: 8px; background: var(--accent); color: var(--accent-ink); font-size: 12px; font-weight: 700; }
+  .home i { display: block; width: 16px; height: 16px; border-radius: 50%; background: #2F6FD0; border: 3px solid var(--surface); box-shadow: 0 0 0 1.5px #2F6FD0, 0 2px 6px rgba(0,0,0,0.25); }
+  .home b { padding: 2px 8px; border-radius: 8px; background: #2F6FD0; color: #fff; white-space: nowrap; font-size: 12px; font-weight: 700; }
   @media (prefers-reduced-motion: no-preference) {
     .home i { animation: pulse 2.4s ease-out infinite; }
     @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(47,110,98,0.5), 0 2px 6px rgba(0,0,0,0.25); } 70% { box-shadow: 0 0 0 14px rgba(47,110,98,0), 0 2px 6px rgba(0,0,0,0.25); } 100% { box-shadow: 0 0 0 0 rgba(47,110,98,0), 0 2px 6px rgba(0,0,0,0.25); } }
@@ -159,7 +159,7 @@
 
   <div id="map" role="application" aria-label="Weather radar map"></div>
 
-  <div class="chip">Radar<small>Waxahachie, TX</small></div>
+  <div class="chip">Radar<small id="chipPlace">Waxahachie, TX</small></div>
   <div class="legend" id="legend" hidden><span>light</span><i></i><span>heavy</span></div>
 
   <div class="msg" id="msg" hidden></div>
@@ -178,6 +178,7 @@
 <script>
   var HOME = [32.386, -96.848];
   var HOME_ZOOM = 8;
+  var HERE = HOME;   // where you are now; starts at home until the phone gives a position
   var FEED = "https://api.rainviewer.com/public/weather-maps.json";
   var FRAME_MS = 600;
   var HOLD_MS = 1800;
@@ -196,10 +197,10 @@
     onAdd: function () {
       var box = L.DomUtil.create("div", "leaflet-bar");
       var a = L.DomUtil.create("a", "recenter", box);
-      a.href = "#"; a.title = "Back to Waxahachie"; a.setAttribute("role", "button"); a.setAttribute("aria-label", "Back to Waxahachie");
+      a.href = "#"; a.title = "Back to my location"; a.setAttribute("role", "button"); a.setAttribute("aria-label", "Back to my location");
       a.innerHTML = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3.2"/><circle cx="12" cy="12" r="8"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>';
       L.DomEvent.disableClickPropagation(box);
-      L.DomEvent.on(a, "click", function (e) { L.DomEvent.preventDefault(e); map.flyTo(HOME, HOME_ZOOM, { duration: 0.6 }); });
+      L.DomEvent.on(a, "click", function (e) { L.DomEvent.preventDefault(e); map.flyTo(HERE, HOME_ZOOM, { duration: 0.6 }); locate(true); });
       return box;
     }
   });
@@ -396,6 +397,55 @@
     icon: L.divIcon({ className: "anchor", html: '<div class="home"><i></i><b>Waxahachie</b></div>', iconSize: [0, 0] }),
     interactive: false, keyboard: false, zIndexOffset: 1000
   }).addTo(map);
+
+  // ---- your current location: blue tag that follows the phone and names the town ----
+  var lastGeo = null, geoBusy = false, firstFix = true;
+  function distKm(a, b) {
+    var R = 6371, dLat = (b[0] - a[0]) * Math.PI / 180, dLon = (b[1] - a[1]) * Math.PI / 180;
+    var x = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.cos(a[0] * Math.PI / 180) * Math.cos(b[0] * Math.PI / 180) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    return 2 * R * Math.asin(Math.sqrt(x));
+  }
+  function setPlaceName(name, state) {
+    var el = homeMarker.getElement();
+    if (el) { var b = el.querySelector("b"); if (b) b.textContent = name; }
+    var chip = document.getElementById("chipPlace");
+    if (chip) chip.textContent = name + (state ? ", " + state : "");
+    declutter();
+  }
+  function reverseGeocode(lat, lon) {
+    if (geoBusy) return; geoBusy = true;
+    // Only rounded coordinates are sent, to OpenStreetMap's Nominatim, just to get a town name.
+    fetch("https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=10&lat=" + lat.toFixed(3) + "&lon=" + lon.toFixed(3))
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        var a = (j && j.address) || {};
+        var name = a.city || a.town || a.village || a.hamlet || a.county || "You are here";
+        var iso = a["ISO3166-2-lvl4"] || "";
+        setPlaceName(name, /^US-/.test(iso) ? iso.slice(3) : (a.state || ""));
+      })
+      .catch(function () { setPlaceName("You are here", ""); })
+      .then(function () { geoBusy = false; });
+  }
+  function onFix(pos) {
+    var here = [pos.coords.latitude, pos.coords.longitude];
+    HERE = here;
+    homeMarker.setLatLng(here);
+    if (firstFix) {
+      firstFix = false;
+      if (!map.getBounds().contains(here)) map.flyTo(here, HOME_ZOOM, { duration: 0.6 });
+    }
+    // Look the name up again only after moving about 2 km, so it stays quick and light.
+    if (!lastGeo || distKm(lastGeo, here) > 2) { lastGeo = here; reverseGeocode(here[0], here[1]); }
+  }
+  function locate(force) {
+    if (!navigator.geolocation) return;
+    if (force) lastGeo = null;
+    navigator.geolocation.getCurrentPosition(onFix, function () {}, { maximumAge: force ? 0 : 60000, timeout: 15000 });
+  }
+  if (navigator.geolocation) {
+    navigator.geolocation.watchPosition(onFix, function () { toast("Location is off, showing Waxahachie"); }, { maximumAge: 60000, timeout: 20000 });
+    document.addEventListener("visibilitychange", function () { if (!document.hidden) locate(false); });
+  }
 
   var cityMarkers = CITIES.map(function (c) {
     var m = L.marker([c[1], c[2]], {
