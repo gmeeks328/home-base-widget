@@ -352,7 +352,8 @@
     view.innerHTML = '<div class="rwrap" id="rwrap"><div class="rmap" id="rmap"></div><div class="rlegend"><span>light</span><i></i><span>heavy</span></div><div class="rcredit">Esri | RainViewer</div>' +
       '<div class="rbar"><a class="rstep off" id="rOlder" aria-label="Earlier frame">&#9664;</a><div class="rwhen"><b id="rClock">--</b><small id="rRel">loading radar</small></div><a class="rstep off" id="rNewer" aria-label="Later frame">&#9654;</a></div></div>';
     var wrap = document.getElementById("rwrap");
-    wrap.style.height = Math.max(200, window.innerHeight - wrap.getBoundingClientRect().top - 10) + "px";
+    // The widget shows only the top ~360pt of the page, but the page itself can be taller, so size the map to the visible part.
+    wrap.style.height = Math.max(180, Math.min(window.innerHeight, 360) - wrap.getBoundingClientRect().top - 10) + "px";
     radarPending = true;
     ensureLeaflet(function (err) {
       if (err || !window.L) { document.getElementById("rRel").textContent = "map unavailable"; radarPending = false; return; }
