@@ -4,89 +4,112 @@
 <title>Home Base Widget</title>
 <meta name="js-widget-title" content="Home Base">
 <meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://api.open-meteo.com" crossorigin>
 <style>
-  /* Layout: one compact column sized for a large iOS widget (~360 x 380pt): header, 3-day weather strip, two tabs, a short list, a timestamp. */
+  /* Layout: one compact column sized for a large iOS widget (~350 x 365pt): header, weather hero, segmented tabs, a grouped list, a timestamp. */
   :root {
-    --bg: #F3F6F5;
+    --bg: #F2F5F4;
     --surface: #FFFFFF;
-    --surface-2: #EBF1EE;
-    --ink: #16211D;
-    --ink-muted: #56685F;
-    --ink-faint: #7C9086;
-    --line: #DCE4E0;
+    --surface-2: #E9EFEC;
+    --ink: #14201B;
+    --ink-muted: #52645C;
+    --ink-faint: #78897F;
+    --line: #E1E8E4;
     --accent: #2F6E62;
-    --accent-soft: #DEEAE6;
+    --accent-ink: #FFFFFF;
+    --accent-soft: #DDEAE5;
     --warn: #A6791F;
+    --glow: rgba(47, 110, 98, 0.16);
+    --shadow: 0 1px 2px rgba(20, 32, 27, 0.05), 0 8px 20px -10px rgba(20, 32, 27, 0.22);
+    --t-church: #6F63E0;
+    --t-daycare: #D9962B;
+    --t-emmy: #DE5F85;
     --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+    --font-round: ui-rounded, "SF Pro Rounded", -apple-system, system-ui, sans-serif;
     --font-num: ui-monospace, "SF Mono", Menlo, monospace;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
-      --bg: #0F1613; --surface: #151F1B; --surface-2: #1B2622; --ink: #E8EEEA; --ink-muted: #96A89F;
-      --ink-faint: #7D9086; --line: #263430; --accent: #74C2AC; --accent-soft: #1E2F2A;
-      --warn: #DFB268; color-scheme: dark;
+      --bg: #0E1512; --surface: #16201C; --surface-2: #1C2824; --ink: #E9EFEB; --ink-muted: #98AAA1;
+      --ink-faint: #7F9288; --line: #25332E; --accent: #74C2AC; --accent-ink: #0E1512; --accent-soft: #1E3029;
+      --warn: #DFB268; --glow: rgba(116, 194, 172, 0.13); --shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+      --t-church: #9A90FF; --t-daycare: #EDB24F; --t-emmy: #F08CA9; color-scheme: dark;
     }
   }
   :root[data-theme="dark"] {
-    --bg: #0F1613; --surface: #151F1B; --surface-2: #1B2622; --ink: #E8EEEA; --ink-muted: #96A89F;
-    --ink-faint: #7D9086; --line: #263430; --accent: #74C2AC; --accent-soft: #1E2F2A;
-    --warn: #DFB268; color-scheme: dark;
+    --bg: #0E1512; --surface: #16201C; --surface-2: #1C2824; --ink: #E9EFEB; --ink-muted: #98AAA1;
+    --ink-faint: #7F9288; --line: #25332E; --accent: #74C2AC; --accent-ink: #0E1512; --accent-soft: #1E3029;
+    --warn: #DFB268; --glow: rgba(116, 194, 172, 0.13); --shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --t-church: #9A90FF; --t-daycare: #EDB24F; --t-emmy: #F08CA9; color-scheme: dark;
   }
 
   * { box-sizing: border-box; }
   body {
     margin: 0;
-    background: var(--bg);
+    background: radial-gradient(120% 55% at 50% -12%, var(--glow), transparent 62%), var(--bg);
+    background-color: var(--bg);
     color: var(--ink);
-    font: 13px/1.35 var(--font-ui);
+    font: 13px/1.3 var(--font-ui);
     -webkit-font-smoothing: antialiased;
-    padding-block: 10px;
-    padding-left: max(16px, env(safe-area-inset-left, 0px));
-    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 8px;
+    padding-left: max(14px, env(safe-area-inset-left, 0px));
+    padding-right: max(14px, env(safe-area-inset-right, 0px));
   }
   .wrap { max-width: 420px; margin: 0 auto; }
 
-  header { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
-  h1 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -0.01em; text-wrap: balance; }
-  .today-stamp { font-family: var(--font-num); font-size: 12px; color: var(--ink-muted); white-space: nowrap; }
+  header { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 0 2px; }
+  h1 { margin: 0; font: 700 18px/1.1 var(--font-round); letter-spacing: -0.015em; text-wrap: balance; }
+  .today-stamp { font: 600 11px/1 var(--font-round); color: var(--ink-muted); white-space: nowrap; padding: 5px 9px; border-radius: 100px; background: var(--surface); border: 1px solid var(--line); }
 
-  .wx { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 8px 0 0; }
-  .wx-card { background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 5px 4px 6px; text-align: center; }
-  .wx-day { font-family: var(--font-num); font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink-faint); }
-  .wx-mid { display: flex; justify-content: center; align-items: center; gap: 4px; margin: 2px 0 1px; }
-  .wx-icon { width: 20px; height: 20px; color: var(--accent); flex: none; }
-  .wx-temp { font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
-  .wx-temp .lo { color: var(--ink-faint); font-weight: 500; }
-  .wx-rain { font-family: var(--font-num); font-size: 9.5px; color: var(--ink-muted); }
+  /* Weather hero: today big on the left, the next two days on the right. */
+  .wx { margin: 8px 0 0; }
+  .hero { --cloud-fill: var(--accent-soft); display: flex; align-items: center; gap: 10px; padding: 6px 6px 6px 12px; border-radius: 18px; background: var(--accent-soft); border: 1px solid var(--line); box-shadow: var(--shadow); }
+  .hero-main { flex: 1; display: flex; align-items: center; gap: 9px; min-width: 0; }
+  .hero-icon { width: 38px; height: 38px; color: var(--accent); flex: none; }
+  .hero-eyebrow { font: 600 9px/1 var(--font-num); letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-muted); }
+  .hero-temp { font: 700 28px/1.05 var(--font-round); letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+  .hero-sub { font-size: 10.5px; color: var(--ink-muted); white-space: nowrap; }
+  .hero-next { display: flex; gap: 4px; }
+  .nx { width: 56px; padding: 4px 0 4px; border-radius: 13px; background: var(--surface); text-align: center; }
+  .nx-day { font: 600 9px/1 var(--font-num); letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-faint); }
+  .nx-icon { display: block; width: 17px; height: 17px; margin: 2px auto 1px; color: var(--accent); --cloud-fill: var(--surface); }
+  .nx-t { font: 700 12px/1.1 var(--font-round); font-variant-numeric: tabular-nums; }
+  .nx-t .lo { color: var(--ink-faint); font-weight: 500; }
+  .nx-r { font: 9px/1.1 var(--font-num); color: var(--ink-muted); margin-top: 1px; }
 
-  .tabs { display: flex; gap: 6px; margin: 8px 0 6px; }
+  /* Segmented tabs */
+  .tabs { display: flex; gap: 2px; margin: 7px 0 6px; padding: 3px; border-radius: 100px; background: var(--surface-2); border: 1px solid var(--line); }
   .tab {
     flex: 1;
     text-align: center;
     padding: 5px 0;
     border-radius: 100px;
-    border: 1px solid var(--line);
     color: var(--ink-muted);
     text-decoration: none;
-    font-weight: 600;
-    font-size: 12.5px;
+    font: 600 12.5px/1.2 var(--font-round);
     --wweb2-overlay-btn-color: rgba(0, 0, 0, 0);
     --wweb2-overlay-btn-press-color: rgba(47, 110, 98, 0.25);
     --wweb2-overlay-btn-corner-radius: 100px;
   }
-  .tab[aria-current="page"] { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+  .tab[aria-current="page"] { background: var(--accent); color: var(--accent-ink); box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18); }
   .tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-  .list { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
-  .row { display: grid; grid-template-columns: 74px minmax(0, 1fr); gap: 10px; padding: 6px 12px; border-top: 1px solid var(--line); }
+  .list { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow); overflow: hidden; }
+
+  /* Schedule rows: date chip + events with a colored dot per kind */
+  .row { display: grid; grid-template-columns: 50px minmax(0, 1fr); gap: 10px; align-items: center; padding: 4px 10px; border-top: 1px solid var(--line); }
   .row:first-child { border-top: none; }
-  .day { font-weight: 700; font-size: 12.5px; }
-  .day small { display: block; font-family: var(--font-num); font-weight: 400; font-size: 10.5px; color: var(--ink-faint); }
-  .row.is-today .day { color: var(--accent); }
-  .ev { display: flex; gap: 8px; align-items: baseline; min-width: 0; }
-  .ev + .ev { margin-top: 3px; }
-  .ev time { font-family: var(--font-num); font-size: 11px; color: var(--ink-muted); white-space: nowrap; }
-  .ev span { overflow-wrap: anywhere; }
+  .chip { height: 30px; border-radius: 9px; background: var(--surface-2); display: flex; flex-direction: column; align-items: center; justify-content: center; }
+  .chip small { font: 600 8px/1 var(--font-num); letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink-faint); white-space: nowrap; }
+  .chip b { font: 700 15px/1.05 var(--font-round); font-variant-numeric: tabular-nums; }
+  .row.is-today .chip { background: var(--accent); }
+  .row.is-today .chip small, .row.is-today .chip b { color: var(--accent-ink); }
+  .row.is-today .chip small { opacity: 0.85; }
+  .ev { display: flex; gap: 7px; align-items: baseline; min-width: 0; }
+  .ev + .ev { margin-top: 2px; }
+  .ev i { flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--tone, var(--accent)); align-self: center; }
+  .ev time { font: 11px/1.3 var(--font-num); color: var(--ink-muted); white-space: nowrap; }
+  .ev span { font-weight: 600; overflow-wrap: anywhere; }
   .clear { color: var(--ink-faint); font-style: italic; }
 
   .irow { padding: 5px 12px 6px; border-top: 1px solid var(--line); }
@@ -94,26 +117,27 @@
   .itop { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
   .iname { font-weight: 700; }
   .idesc { color: var(--ink-faint); font-size: 11px; }
-  .icount { font-family: var(--font-num); font-variant-numeric: tabular-nums; font-size: 14px; font-weight: 500; }
-  .bar { height: 3px; border-radius: 3px; background: var(--accent-soft); margin-top: 4px; overflow: hidden; }
-  .bar i { display: block; height: 100%; background: var(--accent); }
+  .icount { font: 600 15px/1 var(--font-round); font-variant-numeric: tabular-nums; }
+  .bar { height: 4px; border-radius: 4px; background: var(--accent-soft); margin-top: 4px; overflow: hidden; }
+  .bar i { display: block; height: 100%; border-radius: 4px; background: var(--accent); }
   .irow.watch .bar i { background: var(--warn); }
+  .irow.watch .icount { color: var(--warn); }
 
   .stamp.off { display: none; }
-  .stamp { margin-top: 6px; padding-right: 40px; font-size: 10px; color: var(--ink-faint); font-family: var(--font-num); display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+  .stamp { margin-top: 6px; padding: 0 40px 0 4px; font-size: 10px; color: var(--ink-faint); font-family: var(--font-num); display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 
-  /* Radar tab: hides the forecast strip and timestamp so the map gets the room. Leaflet is loaded only when this tab is opened. */
+  /* Radar tab: hides the forecast hero and timestamp so the map gets the room. Leaflet is loaded only when this tab is opened. */
   body.radar .wx, body.radar .stamp { display: none; }
-  body.radar .list { background: none; border: none; }
-  .rwrap { position: relative; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); background: var(--surface-2); }
+  body.radar .list { background: none; border: none; box-shadow: none; overflow: visible; }
+  .rwrap { position: relative; border-radius: 18px; overflow: hidden; border: 1px solid var(--line); background: var(--surface-2); box-shadow: var(--shadow); }
   .rmap { position: absolute; inset: 0; }
   .rwrap .anchor { background: none; border: none; }
   .rhome { position: absolute; left: 0; top: 0; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 3px; }
   .rhome i { display: block; width: 13px; height: 13px; border-radius: 50%; background: #2F6FD0; border: 3px solid #fff; box-shadow: 0 0 0 1.5px #2F6FD0, 0 2px 6px rgba(0,0,0,0.25); }
   .rhome b { padding: 1px 7px; border-radius: 8px; background: #2F6FD0; color: #fff; font-size: 10.5px; font-weight: 700; white-space: nowrap; }
-  .rlegend { position: absolute; z-index: 800; top: 6px; right: 6px; padding: 3px 7px; border-radius: 100px; background: rgba(255,255,255,0.94); border: 1px solid rgba(0,0,0,0.12); font-size: 9.5px; color: #555; display: flex; align-items: center; gap: 4px; }
+  .rlegend { position: absolute; z-index: 800; top: 7px; right: 7px; padding: 3px 7px; border-radius: 100px; background: rgba(255,255,255,0.94); border: 1px solid rgba(0,0,0,0.12); font-size: 9.5px; color: #555; display: flex; align-items: center; gap: 4px; }
   .rlegend i { display: block; width: 38px; height: 5px; border-radius: 3px; background: linear-gradient(90deg, #3aa845, #f0e030, #f08020, #d02020, #b020a0); }
-  .rbar { position: absolute; z-index: 800; left: 6px; right: 6px; bottom: 6px; display: flex; align-items: center; gap: 6px; padding: 4px; border-radius: 100px; background: rgba(255,255,255,0.95); border: 1px solid rgba(0,0,0,0.12); color: #1d2a27; }
+  .rbar { position: absolute; z-index: 800; left: 7px; right: 7px; bottom: 7px; display: flex; align-items: center; gap: 6px; padding: 4px; border-radius: 100px; background: rgba(255,255,255,0.95); border: 1px solid rgba(0,0,0,0.12); color: #1d2a27; }
   .rstep { flex: 0 0 auto; width: 40px; height: 30px; display: flex; align-items: center; justify-content: center; border-radius: 100px; border: 1px solid rgba(0,0,0,0.12); color: #2F6E62; font-size: 16px; font-weight: 700; text-decoration: none;
     --wweb2-overlay-btn-color: rgba(0, 0, 0, 0);
     --wweb2-overlay-btn-press-color: rgba(47, 110, 98, 0.25);
@@ -122,7 +146,7 @@
   .rwhen { flex: 1; text-align: center; line-height: 1.1; }
   .rwhen b { display: block; font-size: 13.5px; font-variant-numeric: tabular-nums; }
   .rwhen small { font-size: 10px; color: #666; }
-  .rcredit { position: absolute; z-index: 700; right: 8px; bottom: 46px; font-size: 7.5px; color: #555; background: rgba(255,255,255,0.7); padding: 0 3px; border-radius: 3px; }
+  .rcredit { position: absolute; z-index: 700; right: 9px; bottom: 47px; font-size: 7.5px; color: #555; background: rgba(255,255,255,0.7); padding: 0 3px; border-radius: 3px; }
 </style>
 
 <div class="wrap">
@@ -142,7 +166,7 @@
         <g stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
           <line x1="10" y1="1.5" x2="10" y2="3.3"/><line x1="3.3" y1="9" x2="1.5" y2="9"/><line x1="4.8" y1="3.8" x2="6.1" y2="5.1"/>
         </g>
-        <path d="M9 21h10.5a4 4 0 0 0 .5-7.97 5.2 5.2 0 0 0-9.3-2.9A4.3 4.3 0 0 0 9 21Z" fill="var(--surface-2)" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+        <path d="M9 21h10.5a4 4 0 0 0 .5-7.97 5.2 5.2 0 0 0-9.3-2.9A4.3 4.3 0 0 0 9 21Z" fill="var(--cloud-fill, var(--surface-2))" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
       </symbol>
       <symbol id="i-cloud" viewBox="0 0 28 28">
         <path d="M6 21h14.5a4.2 4.2 0 0 0 .6-8.36A6 6 0 0 0 9.8 10.3 4.6 4.6 0 0 0 6 21Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
@@ -238,12 +262,19 @@
   var todayKey = keyOf(now);
   var tomorrowKey = keyOf(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1));
 
-  function dayLabel(k) {
+  function chip(k) {
     var dt = fromKey(k);
-    var main = k === todayKey ? "Today" : (k === tomorrowKey ? "Tomorrow" : DAYS[dt.getDay()]);
-    return '<div class="day">' + main + '<small>' + MONTHS[dt.getMonth()] + ' ' + dt.getDate() + '</small></div>';
+    var top = k === todayKey ? "Today" : (k === tomorrowKey ? "Tmrw" : DAYS[dt.getDay()] + " " + MONTHS[dt.getMonth()]);
+    return '<div class="chip"><small>' + top + '</small><b>' + dt.getDate() + '</b></div>';
   }
   function eventsOn(k) { return EVENTS.filter(function (e) { return e.d === k; }); }
+  // A dot color per kind of event; anything else uses the accent.
+  function tone(w) {
+    if (/church/i.test(w)) return "var(--t-church)";
+    if (/daycare/i.test(w)) return "var(--t-daycare)";
+    if (/emmy/i.test(w)) return "var(--t-emmy)";
+    return "var(--accent)";
+  }
 
   /* ---------- weather ---------- */
   var wxLive = false;
@@ -260,19 +291,24 @@
     return "partly";
   }
 
+  function wxFor(i) {
+    var k = keyOf(new Date(now.getFullYear(), now.getMonth(), now.getDate() + i));
+    var w = WX[k];
+    return { w: w, icon: w ? (w.k || (w.p >= 40 ? "rain" : "partly")) : "partly", day: i === 0 ? "Today" : DAYS[fromKey(k).getDay()] };
+  }
+
   function renderWx() {
-    var html = "";
-    for (var i = 0; i < 3; i++) {
-      var k = keyOf(new Date(now.getFullYear(), now.getMonth(), now.getDate() + i));
-      var w = WX[k];
-      var label = i === 0 ? "Today" : DAYS[fromKey(k).getDay()];
-      var icon = w ? (w.k || (w.p >= 40 ? "rain" : "partly")) : "partly";
-      var temp = w ? Math.round(w.hi) + '° <span class="lo">/ ' + Math.round(w.lo) + '°</span>' : '—° <span class="lo">/ —°</span>';
-      var rain = w ? w.p + '% rain' : '— rain';
-      html += '<div class="wx-card"><div class="wx-day">' + label + '</div>' +
-        '<div class="wx-mid"><svg class="wx-icon"><use href="#i-' + icon + '"></use></svg>' +
-        '<div class="wx-temp">' + temp + '</div></div><div class="wx-rain">' + rain + '</div></div>';
+    var t = wxFor(0), main = t.w;
+    var html = '<div class="hero"><div class="hero-main"><svg class="hero-icon"><use href="#i-' + t.icon + '"></use></svg>' +
+      '<div><div class="hero-eyebrow">Today’s high</div><div class="hero-temp">' + (main ? Math.round(main.hi) : "—") + '°</div>' +
+      '<div class="hero-sub">Low ' + (main ? Math.round(main.lo) : "—") + '° · ' + (main ? main.p : "—") + '% rain</div></div></div><div class="hero-next">';
+    for (var i = 1; i < 3; i++) {
+      var n = wxFor(i), w = n.w;
+      html += '<div class="nx"><div class="nx-day">' + n.day + '</div><svg class="nx-icon"><use href="#i-' + n.icon + '"></use></svg>' +
+        '<div class="nx-t">' + (w ? Math.round(w.hi) : "—") + '° <span class="lo">' + (w ? Math.round(w.lo) : "—") + '°</span></div>' +
+        '<div class="nx-r">' + (w ? w.p : "—") + '%</div></div>';
     }
+    html += '</div></div>';
     document.getElementById("wx").innerHTML = html;
     document.getElementById("wxNote").textContent = wxLive ? "Forecast live" : "Forecast as of " + WX_SNAPSHOT_DATE;
   }
@@ -283,7 +319,7 @@
     if (!window.fetch) return;
     wxPending = true;
     var ctrl = window.AbortController ? new AbortController() : null;
-    var timer = setTimeout(function () { if (ctrl) ctrl.abort(); wxPending = false; }, 4000);
+    var timer = setTimeout(function () { if (ctrl) ctrl.abort(); wxPending = false; }, 2500);
     fetch(WX_LIVE_URL, ctrl ? { signal: ctrl.signal } : undefined)
       .then(function (r) { return r.json(); })
       .then(function (j) {
@@ -307,9 +343,9 @@
     keys.slice(0, n).forEach(function (k) { rows.push({ k: k, ev: eventsOn(k), today: false }); });
     return rows.map(function (r) {
       var body = r.ev.length
-        ? r.ev.map(function (e) { return '<div class="ev"><time>' + e.t + '</time><span>' + e.w + '</span></div>'; }).join("")
+        ? r.ev.map(function (e) { return '<div class="ev" style="--tone:' + tone(e.w) + '"><i></i><time>' + e.t + '</time><span>' + e.w + '</span></div>'; }).join("")
         : '<div class="clear">Nothing on the calendar</div>';
-      return '<div class="row' + (r.today ? ' is-today' : '') + '">' + dayLabel(r.k) + '<div>' + body + '</div></div>';
+      return '<div class="row' + (r.today ? ' is-today' : '') + '">' + chip(r.k) + '<div>' + body + '</div></div>';
     }).join("");
   }
 
@@ -339,18 +375,50 @@
 
 
   // ---- Radar tab (same map as radar-widget.html: Esri topographic with boosted greens, RainViewer radar, hash picks the frame) ----
-  var RADAR = { home: [32.386, -96.848], name: "Waxahachie", zoom: 8, feed: null, map: null, pending: 0, loading: false };
+  var RADAR = { home: [32.386, -96.848], name: "Waxahachie", zoom: 8, feed: null, feedP: null, map: null, pending: 0, prefetched: false };
   var radarPending = false;
+
   function loadScript(src, cb) { var s = document.createElement("script"); s.src = src; s.onload = function () { cb(); }; s.onerror = function () { cb(new Error("script")); }; document.head.appendChild(s); }
+  // Safe to call many times: the first call loads Leaflet, later calls wait for that same load.
+  var leafletWaiters = null;
   function ensureLeaflet(cb) {
     if (window.L) return cb();
+    if (leafletWaiters) { leafletWaiters.push(cb); return; }
+    leafletWaiters = [cb];
     var l = document.createElement("link"); l.rel = "stylesheet"; l.href = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css"; document.head.appendChild(l);
-    loadScript("https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js", function (e) { cb(e); });
+    loadScript("https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js", function (e) {
+      var w = leafletWaiters; leafletWaiters = null;
+      w.forEach(function (f) { f(e); });
+    });
+  }
+  function fetchFeed() {
+    if (RADAR.feed) return Promise.resolve(RADAR.feed);
+    if (RADAR.feedP) return RADAR.feedP;
+    RADAR.feedP = fetch("https://api.rainviewer.com/public/weather-maps.json", { cache: "no-store" })
+      .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+      .then(function (j) {
+        RADAR.feed = { past: (j.radar && j.radar.past) || [], host: j.host || "https://tilecache.rainviewer.com" };
+        if (!RADAR.feed.past.length) throw new Error("none");
+        return RADAR.feed;
+      })
+      .catch(function (e) { RADAR.feedP = null; throw e; });
+    return RADAR.feedP;
+  }
+  // Starts everything the map needs at once (script, feed, connections) so none of it waits on the others.
+  function prefetchRadar() {
+    if (RADAR.prefetched) return;
+    RADAR.prefetched = true;
+    ["https://cdnjs.cloudflare.com", "https://server.arcgisonline.com", "https://api.rainviewer.com", "https://tilecache.rainviewer.com"].forEach(function (u) {
+      var l = document.createElement("link"); l.rel = "preconnect"; l.href = u; l.crossOrigin = ""; document.head.appendChild(l);
+    });
+    ensureLeaflet(function () {});
+    fetchFeed().catch(function () {});
   }
   function radarFrame() { var m = /^radar(\d*)$/.exec((window.location.hash || "").replace("#", "")); return m && m[1] ? parseInt(m[1], 10) : 0; }
 
   function renderRadar(view) {
     document.body.classList.add("radar");
+    prefetchRadar();
     view.innerHTML = '<div class="rwrap" id="rwrap"><div class="rmap" id="rmap"></div><div class="rlegend"><span>light</span><i></i><span>heavy</span></div><div class="rcredit">Esri | RainViewer</div>' +
       '<div class="rbar"><a class="rstep off" id="rOlder" aria-label="Earlier frame">&#9664;</a><div class="rwhen"><b id="rClock">--</b><small id="rRel">loading radar</small></div><a class="rstep off" id="rNewer" aria-label="Later frame">&#9654;</a></div></div>';
     var wrap = document.getElementById("rwrap");
@@ -363,14 +431,7 @@
     });
   }
 
-  function startRadarMap() {
-    var L = window.L;
-    if (RADAR.map) { try { RADAR.map.remove(); } catch (e) {} RADAR.map = null; }
-    var map = L.map("rmap", { center: RADAR.home, zoom: RADAR.zoom, zoomControl: false, attributionControl: false, dragging: false, touchZoom: false, scrollWheelZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false });
-    RADAR.map = map;
-    map.createPane("base").style.zIndex = 150;
-    var SERVICES = "https://server.arcgisonline.com/ArcGIS/rest/services/";
-    function applyBaseFilter() { map.getPane("base").style.filter = recolorOk ? "none" : "saturate(1.25)"; }
+  // ---- terrain recolor: boosts only the vegetation greens of Esri's topo tiles ----
   var recolorOk = true;
   var GREEN_BOOST = 3.4;   // raise for richer greens, lower for paler
   function rgb2hsl(r, g, b) {
@@ -394,47 +455,60 @@
   }
   function recolor(px) {
     for (var i = 0; i < px.length; i += 4) {
-      if (px[i + 3] === 0) continue;
-      var hsl = rgb2hsl(px[i], px[i + 1], px[i + 2]), h = hsl[0], s = hsl[1], l = hsl[2];
-      // Only vegetation greens are touched; water, roads, land tan and text keep Esri's own colors.
+      var R = px[i], G = px[i + 1], B = px[i + 2];
+      // Cheap exit for pixels that cannot be vegetation green (hue 55-170 needs G >= B and G within 10% of R or above):
+      // water, roads, tan land, gray and text skip all the HSL math below.
+      if (G < B || G * 10 < R * 9 || px[i + 3] === 0) continue;
+      var hi = G > R ? G : R, lo = B < R ? B : R;
+      if (hi - lo < 8) continue;
+      var hsl = rgb2hsl(R, G, B), h = hsl[0], s = hsl[1], l = hsl[2];
       if (h < 55 || h > 170 || s < 0.05) continue;
       s = Math.min(0.7, s * GREEN_BOOST + 0.14); h = h + (112 - h) * 0.5; l = l * 0.93;
       var c = hsl2rgb(h, s, l);
       px[i] = c[0]; px[i + 1] = c[1]; px[i + 2] = c[2];
     }
   }
-  var RecolorTerrain = L.GridLayer.extend({
-    createTile: function (coords, done) {
-      var size = this.getTileSize();
-      var tile = L.DomUtil.create("canvas", "leaflet-tile");
-      tile.width = size.x; tile.height = size.y;
-      var url = L.Util.template(SERVICES + "World_Topo_Map/MapServer/tile/{z}/{y}/{x}", coords);
-      function paint(img, canRecolor) {
-        var ctx = tile.getContext("2d");
-        ctx.drawImage(img, 0, 0, size.x, size.y);
-        if (canRecolor) {
-          try {
-            var data = ctx.getImageData(0, 0, size.x, size.y);
-            recolor(data.data);
-            ctx.putImageData(data, 0, 0);
-          } catch (e) { recolorOk = false; applyBaseFilter(); }
-        }
-        done(null, tile);
-      }
-      function load(cors) {
-        var img = new Image();
-        if (cors) img.crossOrigin = "anonymous";
-        img.onload = function () { paint(img, cors); };
-        img.onerror = function () {
-          if (cors) { recolorOk = false; applyBaseFilter(); load(false); } else { done(new Error("tile"), tile); }
-        };
-        img.src = url;
-      }
-      load(true);
-      return tile;
-    }
-  });
 
+  function startRadarMap() {
+    var L = window.L;
+    if (RADAR.map) { try { RADAR.map.remove(); } catch (e) {} RADAR.map = null; }
+    var map = L.map("rmap", { center: RADAR.home, zoom: RADAR.zoom, zoomControl: false, attributionControl: false, dragging: false, touchZoom: false, scrollWheelZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false });
+    RADAR.map = map;
+    map.createPane("base").style.zIndex = 150;
+    var SERVICES = "https://server.arcgisonline.com/ArcGIS/rest/services/";
+    function applyBaseFilter() { map.getPane("base").style.filter = recolorOk ? "none" : "saturate(1.25)"; }
+
+    var RecolorTerrain = L.GridLayer.extend({
+      createTile: function (coords, done) {
+        var size = this.getTileSize();
+        var tile = L.DomUtil.create("canvas", "leaflet-tile");
+        tile.width = size.x; tile.height = size.y;
+        var url = L.Util.template(SERVICES + "World_Topo_Map/MapServer/tile/{z}/{y}/{x}", coords);
+        function paint(img, canRecolor) {
+          var ctx = tile.getContext("2d", { willReadFrequently: true });
+          ctx.drawImage(img, 0, 0, size.x, size.y);
+          if (canRecolor) {
+            try {
+              var data = ctx.getImageData(0, 0, size.x, size.y);
+              recolor(data.data);
+              ctx.putImageData(data, 0, 0);
+            } catch (e) { recolorOk = false; applyBaseFilter(); }
+          }
+          done(null, tile);
+        }
+        function load(cors) {
+          var img = new Image();
+          if (cors) img.crossOrigin = "anonymous";
+          img.onload = function () { paint(img, cors); };
+          img.onerror = function () {
+            if (cors) { recolorOk = false; applyBaseFilter(); load(false); } else { done(new Error("tile"), tile); }
+          };
+          img.src = url;
+        }
+        load(true);
+        return tile;
+      }
+    });
 
     function track(layer) {
       layer.on("loading", function () { RADAR.pending++; });
@@ -461,14 +535,10 @@
       setStep(document.getElementById("rOlder"), n + 1, past.length - 1);
       setStep(document.getElementById("rNewer"), n - 1, past.length - 1);
     }
-    function withFeed(cb) {
-      if (RADAR.feed) return cb(RADAR.feed);
-      fetch("https://api.rainviewer.com/public/weather-maps.json", { cache: "no-store" })
-        .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
-        .then(function (j) { RADAR.feed = { past: (j.radar && j.radar.past) || [], host: j.host || "https://tilecache.rainviewer.com" }; if (!RADAR.feed.past.length) throw new Error("none"); cb(RADAR.feed); })
-        .catch(function () { var r = document.getElementById("rRel"); if (r) r.textContent = "radar unavailable"; radarPending = false; });
-    }
-    withFeed(function (f) { draw(f.past, f.host, 6); radarPending = false; });
+    // The feed request was started before Leaflet finished loading, so it is usually already here.
+    fetchFeed()
+      .then(function (f) { draw(f.past, f.host, 6); radarPending = false; })
+      .catch(function () { var r = document.getElementById("rRel"); if (r) r.textContent = "radar unavailable"; radarPending = false; });
   }
 
   function setView(name) {
@@ -483,11 +553,9 @@
     } else if (name === "inbox") {
       view.innerHTML = renderInbox();
     } else {
-      // Show as many upcoming days as the widget height allows.
-      for (var n = 5; n >= 1; n--) {
-        view.innerHTML = renderSchedule(n);
-        if (!overflows()) break;
-      }
+      // Render the longest list once, then trim rows from the bottom until it fits the widget height (always keeps today + 1).
+      view.innerHTML = renderSchedule(5);
+      while (view.children.length > 2 && overflows()) view.removeChild(view.lastElementChild);
     }
     if (!isRadar && overflows()) stamp.classList.add("off");
     ["schedule", "inbox", "radar"].forEach(function (n) {
@@ -506,10 +574,13 @@
   });
 
   var hash = (window.location.hash || "").replace("#", "");
+  // On the Radar tab, get Leaflet, the radar feed and the connections moving before anything else runs.
+  if (/^radar\d*$/.test(hash)) prefetchRadar();
   renderWx();
   setView(hash === "inbox" || hash === "schedule" || /^radar\d*$/.test(hash) ? hash : (getCookie("hb_view") || "schedule"));
   window.addEventListener("hashchange", function () { var h = (window.location.hash || "").replace("#", ""); if (/^radar\d*$/.test(h)) setView(h); });
-  loadLiveWeather();
+  // The forecast is not shown on the Radar tab, so skip that request there.
+  if (!/^radar\d*$/.test(hash)) loadLiveWeather();
 
   document.getElementById("todayStamp").textContent = DAYS[now.getDay()] + " " + MONTHS[now.getMonth()] + " " + now.getDate();
   if (todayKey > DATA_THROUGH) document.getElementById("wxNote").textContent = "Data is out of date";
@@ -521,7 +592,7 @@
   var PAGE_T0 = Date.now();
   function __wweb2WaitMillisecondsToWidgetIsReady(currentDelayMs) {
     if (Date.now() - PAGE_T0 > 12000) return 0;
-    if (document.body.classList.contains("radar")) return (radarPending || RADAR.pending > 0) ? 500 : 0;
-    return wxPending ? 600 : 0;
+    if (document.body.classList.contains("radar")) return (radarPending || RADAR.pending > 0) ? 250 : 0;
+    return wxPending ? 150 : 0;
   }
 </script>
