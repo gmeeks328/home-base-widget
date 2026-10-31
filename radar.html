@@ -95,8 +95,16 @@
   button#play:focus-visible, input[type="range"]:focus-visible, .leaflet-bar a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
   .mid { min-width: 0; }
   input[type="range"] { width: 100%; accent-color: var(--accent); margin: 0; display: block; }
-  .ticks { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 3px; font-family: var(--font-num); font-size: 10.5px; color: var(--ink-muted); }
-  .legend { display: flex; align-items: center; gap: 5px; }
+  .ticks { display: flex; justify-content: space-between; align-items: center; gap: 8px; white-space: nowrap; margin-top: 3px; font-family: var(--font-num); font-size: 10.5px; color: var(--ink-muted); }
+  .legend {
+    position: absolute; z-index: 1000;
+    top: calc(max(12px, env(safe-area-inset-top, 0px)) + 46px);
+    left: max(12px, env(safe-area-inset-left, 0px));
+    display: flex; align-items: center; gap: 6px;
+    padding: 4px 11px; border-radius: 100px;
+    background: var(--surface); border: 1px solid var(--line);
+    font-family: var(--font-num); font-size: 10.5px; color: var(--ink-muted);
+  }
   .legend i { display: block; width: 54px; height: 6px; border-radius: 6px; background: linear-gradient(90deg, #7be07b, #2da02d, #f4e842, #f59b2f, #e0302a, #c21fb4); }
   .legend[hidden] { display: none; }
 
@@ -114,7 +122,7 @@
   .msg[hidden] { display: none; }
   .toast {
     position: absolute; z-index: 1002; left: 50%; transform: translateX(-50%);
-    bottom: calc(max(12px, env(safe-area-inset-bottom, 0px)) + 104px);
+    bottom: calc(max(12px, env(safe-area-inset-bottom, 0px)) + 128px);
     background: var(--surface); border: 1px solid var(--line); border-radius: 100px;
     padding: 6px 14px; font-weight: 600; font-size: 13px;
   }
@@ -150,6 +158,7 @@
   <div id="map" role="application" aria-label="Weather radar map"></div>
 
   <div class="chip">Radar<small>Waxahachie, TX</small></div>
+  <div class="legend" id="legend" hidden><span>light</span><i></i><span>heavy</span></div>
 
   <div class="msg" id="msg" hidden></div>
   <div class="toast" id="toast" hidden></div>
@@ -158,7 +167,7 @@
     <button id="play" type="button" aria-label="Pause">❚❚</button>
     <div class="mid">
       <input id="slider" type="range" min="0" max="0" value="0" step="1" aria-label="Radar frame">
-      <div class="ticks"><span id="t0">&nbsp;</span><span class="legend" id="legend" hidden>light <i></i> heavy</span><span id="t1">&nbsp;</span></div>
+      <div class="ticks"><span id="t0">&nbsp;</span><span id="t1">&nbsp;</span></div>
     </div>
     <div class="when"><b id="t">--:--</b><span id="rel">loading</span></div>
   </div>
@@ -226,7 +235,6 @@
       return box;
     }
   });
-  new StyleBtn().addTo(map);
 
   // ---- basemap (keyless Esri tiles; OpenStreetMap if they refuse to load) ----
   var dark = window.matchMedia("(prefers-color-scheme: dark)");
@@ -328,7 +336,8 @@
       if (z < c.minZoom) { el.style.display = "none"; return; }
       el.style.display = "";
       var r = el.firstChild.getBoundingClientRect();
-      var offscreen = r.right < mapRect.left || r.left > mapRect.right || r.bottom < mapRect.top || r.top > mapRect.bottom;
+      // Hide any label that would be cut off by the screen edge, not just fully offscreen ones.
+      var offscreen = r.left < mapRect.left + 4 || r.right > mapRect.right - 4 || r.top < mapRect.top + 4 || r.bottom > mapRect.bottom - 4;
       var pad = 4;
       var clash = placed.some(function (p) { return r.left < p.right + pad && r.right > p.left - pad && r.top < p.bottom + pad && r.bottom > p.top - pad; });
       if (clash || offscreen) { el.style.display = "none"; } else { placed.push(r); }
@@ -337,6 +346,7 @@
   map.on("zoomend moveend", declutter);
   setBase();
   if (dark.addEventListener) dark.addEventListener("change", setBase);
+  new StyleBtn().addTo(map);
 
   // ---- radar ----
   var frames = [];
@@ -356,6 +366,7 @@
 
   function showMsg(text) { msg.textContent = text; msg.hidden = false; }
   function hideMsg() { msg.hidden = true; }
+  function tickClock(sec) { return clock(sec).replace(/\s?[AP]M$/i, ""); }
   function clock(sec) { return new Date(sec * 1000).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }); }
 
   function clearLayers() { layers.forEach(function (l) { map.removeLayer(l); }); layers = []; }
@@ -422,8 +433,8 @@
         });
         legend.hidden = SCHEME !== 6;
         slider.max = frames.length - 1;
-        t0El.textContent = clock(frames[0].time);
-        t1El.textContent = clock(frames[frames.length - 1].time);
+        t0El.textContent = tickClock(frames[0].time);
+        t1El.textContent = tickClock(frames[frames.length - 1].time);
         hideMsg();
         var lastPast = 0;
         frames.forEach(function (f, i) { if (!f.nowcast) lastPast = i; });
