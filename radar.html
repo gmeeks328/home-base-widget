@@ -246,7 +246,6 @@
   var SERVICES = "https://server.arcgisonline.com/ArcGIS/rest/services/";
   var STYLES = [
     { id: "terrain", name: "Terrain & roads", labels: true },
-    { id: "streets", name: "Streets", labels: false },
     { id: "satellite", name: "Satellite", labels: true },
     { id: "gray", name: "Light gray", labels: true }
   ];
@@ -282,10 +281,10 @@
       tb.on("tileerror", function () {
         tErrors++;
         if (!tLoaded && tErrors >= 4 && style().id === "terrain") {
-          styleIdx = styleIndex("streets");
+          styleIdx = styleIndex("gray");
           setBase();
           styleSync();
-          toast("Terrain not available, showing Streets");
+          toast("Terrain not available, showing Light gray");
         }
       });
       baseLayer = L.layerGroup([tb, roads]);
@@ -300,8 +299,12 @@
     }
     baseLayer.addTo(map);
     // Bright street and OSM tiles get darkened in dark mode; the radar sits in a different pane and is untouched.
-    var invert = wantsDark() && (useOsm || style().id === "streets" || style().id === "terrain");
-    map.getPane("base").style.filter = invert ? "invert(1) hue-rotate(180deg) brightness(0.9) contrast(0.95)" : "none";
+    var invert = wantsDark() && (useOsm || style().id === "terrain");
+    var fx = [];
+    // Terrain tiles are soft by design; boost the color so water, forest and farmland read apart.
+    if (!useOsm && style().id === "terrain") fx.push("saturate(1.7) contrast(1.06)");
+    if (invert) fx.push("invert(1) hue-rotate(180deg) brightness(0.9) contrast(0.95)");
+    map.getPane("base").style.filter = fx.length ? fx.join(" ") : "none";
     applyLabelMode();
   }
 
@@ -336,7 +339,7 @@
   });
 
   function applyLabelMode() {
-    // Our green name tags show wherever the map has no names of its own (not on Streets or the OpenStreetMap fallback).
+    // Our green name tags show on every style except the OpenStreetMap fallback, which carries its own names.
     if (!labelsOn()) {
       cityMarkers.forEach(function (c) { var el = c.marker.getElement(); if (el) el.style.display = "none"; });
       return;
