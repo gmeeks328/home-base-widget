@@ -333,7 +333,9 @@
     } catch (e) { return ""; }
   }
 
-  function overflows() { return document.documentElement.scrollHeight > window.innerHeight + 1; }
+  // The widget shows about 365pt of height; the page viewport can be taller, so measure against the smaller of the two.
+  var WIDGET_H = 365;
+  function overflows() { return document.getElementById("view").getBoundingClientRect().bottom + (document.querySelector(".stamp").offsetHeight || 0) + 12 > Math.min(window.innerHeight, WIDGET_H) + 1; }
 
 
   // ---- Radar tab (same map as radar-widget.html: Esri topographic with boosted greens, RainViewer radar, hash picks the frame) ----
@@ -353,7 +355,7 @@
       '<div class="rbar"><a class="rstep off" id="rOlder" aria-label="Earlier frame">&#9664;</a><div class="rwhen"><b id="rClock">--</b><small id="rRel">loading radar</small></div><a class="rstep off" id="rNewer" aria-label="Later frame">&#9654;</a></div></div>';
     var wrap = document.getElementById("rwrap");
     // The widget shows only the top ~360pt of the page, but the page itself can be taller, so size the map to the visible part.
-    wrap.style.height = Math.max(180, Math.min(window.innerHeight, 360) - wrap.getBoundingClientRect().top - 10) + "px";
+    wrap.style.height = Math.max(180, Math.min(window.innerHeight, WIDGET_H) - wrap.getBoundingClientRect().top - 10) + "px";
     radarPending = true;
     ensureLeaflet(function (err) {
       if (err || !window.L) { document.getElementById("rRel").textContent = "map unavailable"; radarPending = false; return; }
@@ -482,7 +484,7 @@
       view.innerHTML = renderInbox();
     } else {
       // Show as many upcoming days as the widget height allows.
-      for (var n = 3; n >= 1; n--) {
+      for (var n = 5; n >= 1; n--) {
         view.innerHTML = renderSchedule(n);
         if (!overflows()) break;
       }
