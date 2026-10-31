@@ -244,6 +244,78 @@
   var theme = document.documentElement.getAttribute("data-theme");
   function wantsDark() { return theme ? theme === "dark" : dark.matches; }
   var SERVICES = "https://server.arcgisonline.com/ArcGIS/rest/services/";
+
+  // ---- terrain recoloring: water to blue, vegetation to green, bare land to brown, keeping the relief shading ----
+  var recolorOk = true;
+  function rgb2hsl(r, g, b) {
+    r /= 255; g /= 255; b /= 255;
+    var mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2, h = 0, s = 0, d = mx - mn;
+    if (d) {
+      s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
+      if (mx === r) h = (g - b) / d + (g < b ? 6 : 0);
+      else if (mx === g) h = (b - r) / d + 2;
+      else h = (r - g) / d + 4;
+      h *= 60;
+    }
+    return [h, s, l];
+  }
+  function hsl2rgb(h, s, l) {
+    var c = (1 - Math.abs(2 * l - 1)) * s, hp = h / 60, x = c * (1 - Math.abs(hp % 2 - 1)), r = 0, g = 0, b = 0;
+    if (hp < 1) { r = c; g = x; } else if (hp < 2) { r = x; g = c; } else if (hp < 3) { g = c; b = x; }
+    else if (hp < 4) { g = x; b = c; } else if (hp < 5) { r = x; b = c; } else { r = c; b = x; }
+    var m = l - c / 2;
+    return [Math.round((r + m) * 255), Math.round((g + m) * 255), Math.round((b + m) * 255)];
+  }
+  function recolor(px) {
+    for (var i = 0; i < px.length; i += 4) {
+      if (px[i + 3] === 0) continue;
+      var hsl = rgb2hsl(px[i], px[i + 1], px[i + 2]), h = hsl[0], s = hsl[1], l = hsl[2];
+      if (h >= 185 && h <= 260 && s > 0.06) { h = 208; s = Math.min(0.65, s * 2.6 + 0.3); l = l * 0.9; }        // water
+      else if (h >= 60 && h < 185 && s > 0.05) { h = 112; s = Math.min(0.5, s * 2.2 + 0.2); l = l * 0.9; }   // vegetation
+      else { h = 32; s = Math.min(0.5, s * 2.2 + 0.12); l = l * 0.98; }                                       // bare land
+      var c = hsl2rgb(h, s, l);
+      px[i] = c[0]; px[i + 1] = c[1]; px[i + 2] = c[2];
+    }
+  }
+  var RecolorTerrain = L.GridLayer.extend({
+    createTile: function (coords, done) {
+      var size = this.getTileSize();
+      var tile = L.DomUtil.create("canvas", "leaflet-tile");
+      tile.width = size.x; tile.height = size.y;
+      var url = L.Util.template(SERVICES + "World_Terrain_Base/MapServer/tile/{z}/{y}/{x}", coords);
+      function paint(img, canRecolor) {
+        var ctx = tile.getContext("2d");
+        ctx.drawImage(img, 0, 0, size.x, size.y);
+        if (canRecolor) {
+          try {
+            var data = ctx.getImageData(0, 0, size.x, size.y);
+            recolor(data.data);
+            ctx.putImageData(data, 0, 0);
+          } catch (e) { recolorOk = false; applyBaseFilter(); }
+        }
+        done(null, tile);
+      }
+      function load(cors) {
+        var img = new Image();
+        if (cors) img.crossOrigin = "anonymous";
+        img.onload = function () { paint(img, cors); };
+        img.onerror = function () {
+          if (cors) { recolorOk = false; applyBaseFilter(); load(false); } else { done(new Error("tile"), tile); }
+        };
+        img.src = url;
+      }
+      load(true);
+      return tile;
+    }
+  });
+  // If the browser will not let us read the tile pixels, fall back to a plain saturation boost.
+  function applyBaseFilter() {
+    var invert = wantsDark() && (useOsm || style().id === "terrain");
+    var fx = [];
+    if (!useOsm && style().id === "terrain" && !recolorOk) fx.push("saturate(1.7) contrast(1.06)");
+    if (invert) fx.push("invert(1) hue-rotate(180deg) brightness(0.9) contrast(0.95)");
+    map.getPane("base").style.filter = fx.length ? fx.join(" ") : "none";
+  }
   var STYLES = [
     { id: "terrain", name: "Terrain & roads", labels: true },
     { id: "satellite", name: "Satellite", labels: true },
@@ -275,7 +347,7 @@
     } else if (style().id === "terrain") {
       // Shaded terrain with water, plus major highways only. No baked-in town names, so our green tags are the only text.
       var tLoaded = 0, tErrors = 0;
-      var tb = L.tileLayer(SERVICES + "World_Terrain_Base/MapServer/tile/{z}/{y}/{x}", { pane: "base", maxNativeZoom: 13, maxZoom: 19, zIndex: 1, attribution: 'Tiles &copy; Esri' + credit });
+      var tb = new RecolorTerrain({ pane: "base", maxZoom: 19, zIndex: 1, attribution: 'Tiles &copy; Esri' + credit });
       var roads = L.tileLayer(SERVICES + "Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}", { pane: "base", maxZoom: 19, zIndex: 2 });
       tb.on("tileload", function () { tLoaded++; });
       tb.on("tileerror", function () {
@@ -299,12 +371,7 @@
     }
     baseLayer.addTo(map);
     // Bright street and OSM tiles get darkened in dark mode; the radar sits in a different pane and is untouched.
-    var invert = wantsDark() && (useOsm || style().id === "terrain");
-    var fx = [];
-    // Terrain tiles are soft by design; boost the color so water, forest and farmland read apart.
-    if (!useOsm && style().id === "terrain") fx.push("saturate(1.7) contrast(1.06)");
-    if (invert) fx.push("invert(1) hue-rotate(180deg) brightness(0.9) contrast(0.95)");
-    map.getPane("base").style.filter = fx.length ? fx.join(" ") : "none";
+    applyBaseFilter();
     applyLabelMode();
   }
 
