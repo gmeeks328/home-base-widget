@@ -441,7 +441,7 @@
       layer.on("load", function () { RADAR.pending = Math.max(0, RADAR.pending - 1); });
       return layer;
     }
-    track(new RecolorTerrain({ pane: "base", maxZoom: 19 })).addTo(map);
+    track(new RecolorTerrain({ pane: "base", maxZoom: 19, keepBuffer: 0, updateWhenIdle: true })).addTo(map);
     L.marker(RADAR.home, { icon: L.divIcon({ className: "anchor", html: '<div class="rhome"><i></i><b>' + RADAR.name + '</b></div>', iconSize: [0, 0] }), interactive: false, zIndexOffset: 1000 }).addTo(map);
 
     function setStep(el, idx, max) {
@@ -450,7 +450,7 @@
     }
     function draw(past, host, scheme) {
       var n = Math.min(radarFrame(), past.length - 1), f = past[past.length - 1 - n];
-      var layer = track(L.tileLayer(host + f.path + "/256/{z}/{x}/{y}/" + scheme + "/1_1.png", { opacity: 0.85, maxNativeZoom: 7, maxZoom: 10, zIndex: 400 }));
+      var layer = track(L.tileLayer(host + f.path + "/256/{z}/{x}/{y}/" + scheme + "/1_1.png", { opacity: 0.85, maxNativeZoom: 7, maxZoom: 10, zIndex: 400, keepBuffer: 0, updateWhenIdle: true }));
       var ok = 0, bad = 0;
       layer.on("tileload", function () { ok++; });
       layer.on("tileerror", function () { bad++; if (!ok && bad >= 6 && scheme !== 2) { map.removeLayer(layer); draw(past, host, 2); } });
@@ -517,7 +517,7 @@
   // WidgetWeb hooks: wait a little longer only while the live forecast is still loading.
   function __wweb2JsWidgetTitle() { return "Home Base"; }
   function __wweb2WaitMillisecondsToWidgetIsReady(currentDelayMs) {
-    if (currentDelayMs > 8000) return 0;
+    if (currentDelayMs > 6000) return 0;
     if (document.body.classList.contains("radar")) return (radarPending || RADAR.pending > 0) ? 500 : 400;
     return wxPending ? 600 : 0;
   }

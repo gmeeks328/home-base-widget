@@ -133,7 +133,7 @@
     layer.on("load", function () { pending = Math.max(0, pending - 1); });
     return layer;
   }
-  track(new RecolorTerrain({ pane: "base", maxZoom: 19 })).addTo(map);
+  track(new RecolorTerrain({ pane: "base", maxZoom: 19, keepBuffer: 0, updateWhenIdle: true })).addTo(map);
 
   L.marker(HOME, { icon: L.divIcon({ className: "anchor", html: '<div class="home"><i></i><b>' + NAME.replace(/[<>&]/g, "") + '</b></div>', iconSize: [0, 0] }), interactive: false, zIndexOffset: 1000 }).addTo(map);
 
@@ -152,7 +152,7 @@
 
   function draw(host, past, scheme) {
     var n = pick(past), f = past[past.length - 1 - n];
-    var layer = track(L.tileLayer(host + f.path + "/256/{z}/{x}/{y}/" + scheme + "/1_1.png", { opacity: RADAR_OPACITY, maxNativeZoom: 7, maxZoom: 10, zIndex: 400 }));
+    var layer = track(L.tileLayer(host + f.path + "/256/{z}/{x}/{y}/" + scheme + "/1_1.png", { opacity: RADAR_OPACITY, maxNativeZoom: 7, maxZoom: 10, zIndex: 400, keepBuffer: 0, updateWhenIdle: true }));
     var ok = 0, bad = 0;
     layer.on("tileload", function () { ok++; });
     layer.on("tileerror", function () { bad++; if (!ok && bad >= 6 && scheme !== 2) { map.removeLayer(layer); SCHEME = 2; draw(host, past, 2); } });
@@ -178,7 +178,7 @@
   // WidgetWeb hooks: keep waiting while the feed or any map tiles are still loading, but never more than ~8 seconds.
   window.__wweb2JsWidgetTitle = function () { return "Radar"; };
   window.__wweb2WaitMillisecondsToWidgetIsReady = function (currentDelayMs) {
-    if (currentDelayMs > 8000) return 0;
+    if (currentDelayMs > 6000) return 0;
     return (!feedDone || pending > 0) ? 500 : 400;
   };
 })();
