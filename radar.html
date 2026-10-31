@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Waxahachie Radar</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<style>
+  /* Layout: full-bleed map, a small title chip top-left, one control bar pinned to the bottom. */
+  :root {
+    --bg: #F3F6F5;
+    --surface: rgba(255, 255, 255, 0.92);
+    --ink: #16211D;
+    --ink-muted: #56685F;
+    --line: #C4D0CA;
+    --accent: #2F6E62;
+    --accent-ink: #FFFFFF;
+    --warn: #A6791F;
+    --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+    --font-num: ui-monospace, "SF Mono", Menlo, monospace;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0F1613; --surface: rgba(21, 31, 27, 0.92); --ink: #E8EEEA; --ink-muted: #96A89F;
+      --line: #34443E; --accent: #74C2AC; --accent-ink: #0F1613; --warn: #DFB268; color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0F1613; --surface: rgba(21, 31, 27, 0.92); --ink: #E8EEEA; --ink-muted: #96A89F;
+    --line: #34443E; --accent: #74C2AC; --accent-ink: #0F1613; --warn: #DFB268; color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body { background: var(--bg); color: var(--ink); font: 14px/1.35 var(--font-ui); -webkit-font-smoothing: antialiased; }
+  #map { position: absolute; inset: 0; background: var(--bg); }
+
+  .chip, .bar {
+    position: absolute;
+    z-index: 1000;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+  .chip {
+    top: max(12px, env(safe-area-inset-top, 0px));
+    left: max(12px, env(safe-area-inset-left, 0px));
+    padding: 7px 12px;
+    border-radius: 100px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+  .chip small { font-family: var(--font-num); font-weight: 400; color: var(--ink-muted); margin-left: 6px; font-size: 11.5px; }
+
+  .bar {
+    left: max(12px, env(safe-area-inset-left, 0px));
+    right: max(12px, env(safe-area-inset-right, 0px));
+    bottom: max(12px, env(safe-area-inset-bottom, 0px));
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    border-radius: 16px;
+    max-width: 560px;
+    margin: 0 auto;
+  }
+  button#play {
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    border: none;
+    background: var(--accent);
+    color: var(--accent-ink);
+    font-size: 15px;
+    cursor: pointer;
+  }
+  button#play:focus-visible, input[type="range"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  input[type="range"] { width: 100%; accent-color: var(--accent); margin: 0; }
+  .when { text-align: right; min-width: 78px; }
+  .when b { display: block; font-family: var(--font-num); font-size: 15px; font-weight: 500; font-variant-numeric: tabular-nums; }
+  .when span { font-size: 11px; color: var(--ink-muted); }
+  .when span.fc { color: var(--warn); font-weight: 600; }
+
+  .msg {
+    position: absolute; z-index: 1001; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    max-width: min(420px, calc(100% - 32px));
+    background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px;
+    text-align: center;
+  }
+  .msg[hidden] { display: none; }
+
+  .dot-marker { width: 14px; height: 14px; border-radius: 50%; background: var(--accent); border: 3px solid var(--surface); box-shadow: 0 0 0 1px var(--ink-muted); }
+  .leaflet-control-attribution { font-size: 10px; }
+  .leaflet-bottom.leaflet-right { bottom: 78px; }
+</style>
+</head>
+<body>
+  <div id="map" role="application" aria-label="Weather radar map"></div>
+
+  <div class="chip">Radar<small>Waxahachie, TX</small></div>
+
+  <div class="msg" id="msg" hidden></div>
+
+  <div class="bar">
+    <button id="play" type="button" aria-label="Pause">❚❚</button>
+    <input id="slider" type="range" min="0" max="0" value="0" step="1" aria-label="Radar frame">
+    <div class="when"><b id="t">--:--</b><span id="rel">loading</span></div>
+  </div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+<script>
+  var HOME = [32.386, -96.848];
+  var FEED = "https://api.rainviewer.com/public/weather-maps.json";
+  var FRAME_MS = 650;
+  var HOLD_MS = 1800;
+  var REFRESH_MS = 5 * 60 * 1000;
+  // Radar tiles stop at a modest native zoom; Leaflet scales them up beyond that.
+  var RADAR_NATIVE_ZOOM = 7;
+
+  var map = L.map("map", { center: HOME, zoom: 7, minZoom: 4, maxZoom: 10, zoomControl: true });
+
+  var dark = window.matchMedia("(prefers-color-scheme: dark)");
+  var theme = document.documentElement.getAttribute("data-theme");
+  function wantsDark() { return theme ? theme === "dark" : dark.matches; }
+  var baseLayer = null;
+  function setBase() {
+    if (baseLayer) map.removeLayer(baseLayer);
+    baseLayer = L.tileLayer("https://{s}.basemaps.cartocdn.com/" + (wantsDark() ? "dark_all" : "light_all") + "/{z}/{x}/{y}{r}.png", {
+      subdomains: "abcd", maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a> | Radar: <a href="https://www.rainviewer.com/">RainViewer</a>'
+    }).addTo(map);
+    baseLayer.bringToBack();
+  }
+  setBase();
+  if (dark.addEventListener) dark.addEventListener("change", setBase);
+
+  L.marker(HOME, { icon: L.divIcon({ className: "", html: '<div class="dot-marker"></div>', iconSize: [14, 14], iconAnchor: [7, 7] }), keyboard: false, interactive: false }).addTo(map);
+
+  var frames = [];
+  var layers = [];
+  var current = 0;
+  var playing = true;
+  var timer = null;
+
+  var slider = document.getElementById("slider");
+  var playBtn = document.getElementById("play");
+  var tEl = document.getElementById("t");
+  var relEl = document.getElementById("rel");
+  var msg = document.getElementById("msg");
+
+  function showMsg(text) { msg.textContent = text; msg.hidden = false; }
+  function hideMsg() { msg.hidden = true; }
+
+  function clearLayers() {
+    layers.forEach(function (l) { map.removeLayer(l); });
+    layers = [];
+  }
+
+  function show(i) {
+    if (!layers.length) return;
+    current = i;
+    layers.forEach(function (l, idx) { l.setOpacity(idx === i ? 0.75 : 0); });
+    slider.value = i;
+    var f = frames[i];
+    var d = new Date(f.time * 1000);
+    tEl.textContent = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    var mins = Math.round((f.time * 1000 - Date.now()) / 60000);
+    if (f.nowcast) {
+      relEl.textContent = "forecast +" + Math.max(mins, 0) + " min";
+      relEl.className = "fc";
+    } else {
+      relEl.textContent = mins >= -1 ? "now" : Math.abs(mins) + " min ago";
+      relEl.className = "";
+    }
+  }
+
+  function schedule() {
+    clearTimeout(timer);
+    if (!playing) return;
+    var next = (current + 1) % frames.length;
+    var wait = (current === frames.length - 1) ? HOLD_MS : FRAME_MS;
+    timer = setTimeout(function () { show(next); schedule(); }, wait);
+  }
+
+  function setPlaying(on) {
+    playing = on;
+    playBtn.textContent = on ? "❚❚" : "▶";
+    playBtn.setAttribute("aria-label", on ? "Pause" : "Play");
+    if (on) schedule(); else clearTimeout(timer);
+  }
+
+  playBtn.addEventListener("click", function () { setPlaying(!playing); });
+  slider.addEventListener("input", function () { setPlaying(false); show(+slider.value); });
+
+  function load() {
+    fetch(FEED, { cache: "no-store" })
+      .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+      .then(function (j) {
+        var past = (j.radar && j.radar.past) || [];
+        var now = (j.radar && j.radar.nowcast) || [];
+        var list = past.map(function (f) { return { time: f.time, path: f.path, nowcast: false }; })
+          .concat(now.map(function (f) { return { time: f.time, path: f.path, nowcast: true }; }));
+        if (!list.length) throw new Error("no frames");
+        var host = j.host || "https://tilecache.rainviewer.com";
+        var wasLast = frames.length && current === frames.length - 1;
+        clearLayers();
+        frames = list;
+        // Color scheme 2, smoothed, snow shown: /256/{z}/{x}/{y}/2/1_1.png
+        layers = frames.map(function (f) {
+          return L.tileLayer(host + f.path + "/256/{z}/{x}/{y}/2/1_1.png", {
+            opacity: 0, maxNativeZoom: RADAR_NATIVE_ZOOM, maxZoom: 10, tileSize: 256, zIndex: 400
+          }).addTo(map);
+        });
+        slider.max = frames.length - 1;
+        hideMsg();
+        // Start on the newest observed frame, not the forecast.
+        var lastPast = 0;
+        frames.forEach(function (f, i) { if (!f.nowcast) lastPast = i; });
+        show(wasLast ? lastPast : Math.min(current, frames.length - 1) || 0);
+        schedule();
+      })
+      .catch(function (e) {
+        if (!frames.length) showMsg("Radar feed did not load (" + e.message + "). The map still works; try reloading in a minute.");
+      });
+  }
+
+  load();
+  setInterval(load, REFRESH_MS);
+</script>
+</body>
+</html>
