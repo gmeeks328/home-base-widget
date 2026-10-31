@@ -1,0 +1,346 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Home Base Widget</title>
+<meta name="js-widget-title" content="Home Base">
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+  /* Layout: one compact column sized for a large iOS widget (~360 x 380pt): header, 3-day weather strip, two tabs, a short list, a timestamp. */
+  :root {
+    --bg: #F3F6F5;
+    --surface: #FFFFFF;
+    --surface-2: #EBF1EE;
+    --ink: #16211D;
+    --ink-muted: #56685F;
+    --ink-faint: #7C9086;
+    --line: #DCE4E0;
+    --accent: #2F6E62;
+    --accent-soft: #DEEAE6;
+    --warn: #A6791F;
+    --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+    --font-num: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0F1613; --surface: #151F1B; --surface-2: #1B2622; --ink: #E8EEEA; --ink-muted: #96A89F;
+      --ink-faint: #7D9086; --line: #263430; --accent: #74C2AC; --accent-soft: #1E2F2A;
+      --warn: #DFB268; color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0F1613; --surface: #151F1B; --surface-2: #1B2622; --ink: #E8EEEA; --ink-muted: #96A89F;
+    --ink-faint: #7D9086; --line: #263430; --accent: #74C2AC; --accent-soft: #1E2F2A;
+    --warn: #DFB268; color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 13px/1.35 var(--font-ui);
+    -webkit-font-smoothing: antialiased;
+    padding-block: 14px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  .wrap { max-width: 420px; margin: 0 auto; }
+
+  header { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+  h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.01em; text-wrap: balance; }
+  .today-stamp { font-family: var(--font-num); font-size: 12px; color: var(--ink-muted); white-space: nowrap; }
+
+  .wx { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 10px 0 0; }
+  .wx-card {
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 7px 6px 8px;
+    text-align: center;
+  }
+  .wx-day { font-family: var(--font-num); font-size: 10.5px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink-faint); }
+  .wx-icon { width: 24px; height: 24px; color: var(--accent); display: block; margin: 3px auto 3px; }
+  .wx-temp { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .wx-temp .lo { color: var(--ink-faint); font-weight: 500; }
+  .wx-rain { font-family: var(--font-num); font-size: 10px; color: var(--ink-muted); margin-top: 1px; }
+
+  .tabs { display: flex; gap: 6px; margin: 10px 0 8px; }
+  .tab {
+    flex: 1;
+    text-align: center;
+    padding: 7px 0;
+    border-radius: 100px;
+    border: 1px solid var(--line);
+    color: var(--ink-muted);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 12.5px;
+    --wweb2-overlay-btn-color: rgba(0, 0, 0, 0);
+    --wweb2-overlay-btn-press-color: rgba(47, 110, 98, 0.25);
+    --wweb2-overlay-btn-corner-radius: 100px;
+  }
+  .tab[aria-current="page"] { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+  .tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .list { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
+  .row { display: grid; grid-template-columns: 74px minmax(0, 1fr); gap: 10px; padding: 8px 12px; border-top: 1px solid var(--line); }
+  .row:first-child { border-top: none; }
+  .day { font-weight: 700; font-size: 12.5px; }
+  .day small { display: block; font-family: var(--font-num); font-weight: 400; font-size: 10.5px; color: var(--ink-faint); }
+  .row.is-today .day { color: var(--accent); }
+  .ev { display: flex; gap: 8px; align-items: baseline; min-width: 0; }
+  .ev + .ev { margin-top: 3px; }
+  .ev time { font-family: var(--font-num); font-size: 11px; color: var(--ink-muted); white-space: nowrap; }
+  .ev span { overflow-wrap: anywhere; }
+  .clear { color: var(--ink-faint); font-style: italic; }
+
+  .irow { padding: 7px 12px 8px; border-top: 1px solid var(--line); }
+  .irow:first-child { border-top: none; }
+  .itop { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+  .iname { font-weight: 700; }
+  .idesc { color: var(--ink-faint); font-size: 11px; }
+  .icount { font-family: var(--font-num); font-variant-numeric: tabular-nums; font-size: 16px; font-weight: 500; }
+  .bar { height: 3px; border-radius: 3px; background: var(--accent-soft); margin-top: 5px; overflow: hidden; }
+  .bar i { display: block; height: 100%; background: var(--accent); }
+  .irow.watch .bar i { background: var(--warn); }
+
+  .stamp { margin-top: 8px; font-size: 10.5px; color: var(--ink-faint); font-family: var(--font-num); display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+</style>
+
+<div class="wrap">
+  <svg aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden">
+    <defs>
+      <symbol id="i-sun" viewBox="0 0 28 28">
+        <circle cx="14" cy="14" r="5.5" fill="none" stroke="currentColor" stroke-width="1.7"/>
+        <g stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+          <line x1="14" y1="2.5" x2="14" y2="5.5"/><line x1="14" y1="22.5" x2="14" y2="25.5"/>
+          <line x1="2.5" y1="14" x2="5.5" y2="14"/><line x1="22.5" y1="14" x2="25.5" y2="14"/>
+          <line x1="5.6" y1="5.6" x2="7.7" y2="7.7"/><line x1="20.3" y1="20.3" x2="22.4" y2="22.4"/>
+          <line x1="5.6" y1="22.4" x2="7.7" y2="20.3"/><line x1="20.3" y1="7.7" x2="22.4" y2="5.6"/>
+        </g>
+      </symbol>
+      <symbol id="i-partly" viewBox="0 0 28 28">
+        <circle cx="10" cy="9" r="4" fill="none" stroke="currentColor" stroke-width="1.7"/>
+        <g stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+          <line x1="10" y1="1.5" x2="10" y2="3.3"/><line x1="3.3" y1="9" x2="1.5" y2="9"/><line x1="4.8" y1="3.8" x2="6.1" y2="5.1"/>
+        </g>
+        <path d="M9 21h10.5a4 4 0 0 0 .5-7.97 5.2 5.2 0 0 0-9.3-2.9A4.3 4.3 0 0 0 9 21Z" fill="var(--surface-2)" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="i-cloud" viewBox="0 0 28 28">
+        <path d="M6 21h14.5a4.2 4.2 0 0 0 .6-8.36A6 6 0 0 0 9.8 10.3 4.6 4.6 0 0 0 6 21Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+      </symbol>
+      <symbol id="i-rain" viewBox="0 0 28 28">
+        <path d="M6 16h14.5a4.2 4.2 0 0 0 .6-8.36A6 6 0 0 0 9.8 5.3 4.6 4.6 0 0 0 6 16Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+        <g stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+          <line x1="10" y1="19.5" x2="8.5" y2="24"/><line x1="14.5" y1="19.5" x2="13" y2="24"/><line x1="19" y1="19.5" x2="17.5" y2="24"/>
+        </g>
+      </symbol>
+      <symbol id="i-storm" viewBox="0 0 28 28">
+        <path d="M6 15h14.5a4.2 4.2 0 0 0 .6-8.36A6 6 0 0 0 9.8 4.3 4.6 4.6 0 0 0 6 15Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+        <path d="M15.5 16.5 11.5 22.5h3.3l-2 4.5 6-7h-3.6l2-3.5Z" fill="currentColor"/>
+      </symbol>
+      <symbol id="i-snow" viewBox="0 0 28 28">
+        <path d="M6 15h14.5a4.2 4.2 0 0 0 .6-8.36A6 6 0 0 0 9.8 4.3 4.6 4.6 0 0 0 6 15Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/>
+        <g stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+          <line x1="10" y1="19" x2="10" y2="24.5"/><line x1="18" y1="19" x2="18" y2="24.5"/>
+          <line x1="7.6" y1="20.3" x2="12.4" y2="23.2"/><line x1="12.4" y1="20.3" x2="7.6" y2="23.2"/>
+          <line x1="15.6" y1="20.3" x2="20.4" y2="23.2"/><line x1="20.4" y1="20.3" x2="15.6" y2="23.2"/>
+        </g>
+      </symbol>
+      <symbol id="i-fog" viewBox="0 0 28 28">
+        <g stroke="currentColor" stroke-width="1.7" stroke-linecap="round">
+          <line x1="4" y1="9" x2="24" y2="9"/><line x1="4" y1="14" x2="24" y2="14"/><line x1="4" y1="19" x2="24" y2="19"/>
+        </g>
+      </symbol>
+    </defs>
+  </svg>
+
+  <header>
+    <h1>Home Base</h1>
+    <div class="today-stamp" id="todayStamp"></div>
+  </header>
+
+  <section class="wx" id="wx" aria-label="Next 3 days, Waxahachie"></section>
+
+  <nav class="tabs" aria-label="Views">
+    <a class="tab" id="tab-schedule" href="#schedule">Schedule</a>
+    <a class="tab" id="tab-inbox" href="#inbox">Inbox</a>
+  </nav>
+
+  <main class="list" id="view"></main>
+
+  <div class="stamp"><span>Updated Sat Oct 31, 3:53 PM CT</span><span id="wxNote"></span></div>
+</div>
+
+<script>
+  // Snapshots from Google Calendar, Gmail and a weather lookup for Waxahachie, Oct 31 2026. Mail is counts only, no subjects.
+  var EVENTS = [
+    { d: "2026-11-01", t: "8:30a–2p", w: "Renew Church Waco" },
+    { d: "2026-11-02", t: "9a–5p", w: "Emmy's Coming Over" },
+    { d: "2026-11-03", t: "9a–5p", w: "Emmy's Coming Over" },
+    { d: "2026-11-04", t: "8:15–2:15", w: "Ryder at Daycare" },
+    { d: "2026-11-05", t: "8:15–2:15", w: "Ryder at Daycare" },
+    { d: "2026-11-08", t: "8:30a–2p", w: "Renew Church Waco" },
+    { d: "2026-11-09", t: "9a–5p", w: "Emmy's Coming Over" },
+    { d: "2026-11-10", t: "9a–5p", w: "Emmy's Coming Over" },
+    { d: "2026-11-11", t: "8:15–2:15", w: "Ryder at Daycare" },
+    { d: "2026-11-12", t: "8:15–2:15", w: "Ryder at Daycare" }
+  ];
+  var DATA_THROUGH = "2026-11-13";
+  var INBOX = [
+    ["Finance", "accounts & statements", 324, false],
+    ["Bills", "utilities, wireless, subscriptions", 131, false],
+    ["Daycare", "Ark of Friendship updates", 116, false],
+    ["Security", "sign-ins, access alerts", 112, true],
+    ["Personal", "home, orders, the rest", 8, false]
+  ];
+  // hi/lo in °F, p = chance of rain %. Only today's sky condition is known in the snapshot; later days get a rain or neutral icon.
+  var WX = {
+    "2026-10-31": { hi: 74.6, lo: 63.2, p: 10, k: "cloud" },
+    "2026-11-01": { hi: 76.9, lo: 63.0, p: 10 },
+    "2026-11-02": { hi: 78.2, lo: 64.1, p: 10 },
+    "2026-11-03": { hi: 70.6, lo: 49.6, p: 5 },
+    "2026-11-04": { hi: 72.9, lo: 48.7, p: 5 },
+    "2026-11-05": { hi: 74.1, lo: 50.7, p: 0 },
+    "2026-11-06": { hi: 70.4, lo: 51.0, p: 10 },
+    "2026-11-07": { hi: 69.8, lo: 52.1, p: 45 }
+  };
+  var WX_SNAPSHOT_DATE = "Oct 31";
+  var WX_LIVE_URL = "https://api.open-meteo.com/v1/forecast?latitude=32.386&longitude=-96.848&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&temperature_unit=fahrenheit&timezone=America%2FChicago&forecast_days=3";
+
+  var DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  var MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+  function pad(n) { return n < 10 ? "0" + n : "" + n; }
+  function keyOf(dt) { return dt.getFullYear() + "-" + pad(dt.getMonth() + 1) + "-" + pad(dt.getDate()); }
+  function fromKey(k) { var p = k.split("-"); return new Date(+p[0], +p[1] - 1, +p[2]); }
+
+  var now = new Date();
+  var todayKey = keyOf(now);
+  var tomorrowKey = keyOf(new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1));
+
+  function dayLabel(k) {
+    var dt = fromKey(k);
+    var main = k === todayKey ? "Today" : (k === tomorrowKey ? "Tomorrow" : DAYS[dt.getDay()]);
+    return '<div class="day">' + main + '<small>' + MONTHS[dt.getMonth()] + ' ' + dt.getDate() + '</small></div>';
+  }
+  function eventsOn(k) { return EVENTS.filter(function (e) { return e.d === k; }); }
+
+  /* ---------- weather ---------- */
+  var wxLive = false;
+  var wxPending = false;
+
+  function codeToIcon(c) {
+    if (c === 0) return "sun";
+    if (c === 1 || c === 2) return "partly";
+    if (c === 3) return "cloud";
+    if (c === 45 || c === 48) return "fog";
+    if ((c >= 51 && c <= 67) || (c >= 80 && c <= 82)) return "rain";
+    if ((c >= 71 && c <= 77) || c === 85 || c === 86) return "snow";
+    if (c >= 95) return "storm";
+    return "partly";
+  }
+
+  function renderWx() {
+    var html = "";
+    for (var i = 0; i < 3; i++) {
+      var k = keyOf(new Date(now.getFullYear(), now.getMonth(), now.getDate() + i));
+      var w = WX[k];
+      var label = i === 0 ? "Today" : DAYS[fromKey(k).getDay()];
+      var icon = w ? (w.k || (w.p >= 40 ? "rain" : "partly")) : "partly";
+      var temp = w ? Math.round(w.hi) + '° <span class="lo">/ ' + Math.round(w.lo) + '°</span>' : '—° <span class="lo">/ —°</span>';
+      var rain = w ? w.p + '% rain' : '— rain';
+      html += '<div class="wx-card"><div class="wx-day">' + label + '</div>' +
+        '<svg class="wx-icon"><use href="#i-' + icon + '"></use></svg>' +
+        '<div class="wx-temp">' + temp + '</div><div class="wx-rain">' + rain + '</div></div>';
+    }
+    document.getElementById("wx").innerHTML = html;
+    document.getElementById("wxNote").textContent = wxLive ? "Forecast live" : "Forecast as of " + WX_SNAPSHOT_DATE;
+  }
+
+  // Live refresh. Works where the page may call the network (for example hosted on GitHub Pages);
+  // inside a claude.ai artifact the request is blocked, so the snapshot above stays on screen.
+  function loadLiveWeather() {
+    if (!window.fetch) return;
+    wxPending = true;
+    var ctrl = window.AbortController ? new AbortController() : null;
+    var timer = setTimeout(function () { if (ctrl) ctrl.abort(); wxPending = false; }, 4000);
+    fetch(WX_LIVE_URL, ctrl ? { signal: ctrl.signal } : undefined)
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        var d = j.daily, fresh = {};
+        for (var i = 0; i < d.time.length; i++) {
+          fresh[d.time[i]] = { hi: d.temperature_2m_max[i], lo: d.temperature_2m_min[i], p: d.precipitation_probability_max[i] || 0, k: codeToIcon(d.weather_code[i]) };
+        }
+        WX = fresh;
+        wxLive = true;
+        renderWx();
+      })
+      .catch(function () {})
+      .then(function () { clearTimeout(timer); wxPending = false; });
+  }
+
+  /* ---------- schedule / inbox ---------- */
+  function renderSchedule() {
+    var rows = [{ k: todayKey, ev: eventsOn(todayKey), today: true }];
+    var keys = [];
+    EVENTS.forEach(function (e) { if (e.d > todayKey && keys.indexOf(e.d) < 0) keys.push(e.d); });
+    keys.slice(0, 3).forEach(function (k) { rows.push({ k: k, ev: eventsOn(k), today: false }); });
+    return rows.map(function (r) {
+      var body = r.ev.length
+        ? r.ev.map(function (e) { return '<div class="ev"><time>' + e.t + '</time><span>' + e.w + '</span></div>'; }).join("")
+        : '<div class="clear">Nothing on the calendar</div>';
+      return '<div class="row' + (r.today ? ' is-today' : '') + '">' + dayLabel(r.k) + '<div>' + body + '</div></div>';
+    }).join("");
+  }
+
+  function renderInbox() {
+    var max = Math.max.apply(null, INBOX.map(function (r) { return r[2]; }));
+    return INBOX.map(function (r) {
+      var pct = Math.max(3, Math.round(r[2] / max * 100));
+      return '<div class="irow' + (r[3] ? ' watch' : '') + '"><div class="itop"><div><span class="iname">' + r[0] +
+        '</span> <span class="idesc">' + r[1] + '</span></div><div class="icount">' + r[2] +
+        '</div></div><div class="bar"><i style="width:' + pct + '%"></i></div></div>';
+    }).join("");
+  }
+
+  function setCookie(name, value) {
+    try { document.cookie = name + "=" + value + ";max-age=31536000;path=/;SameSite=Lax"; } catch (e) {}
+  }
+  function getCookie(name) {
+    try {
+      var m = document.cookie.match(new RegExp("(?:^|; )" + name + "=([^;]*)"));
+      return m ? m[1] : "";
+    } catch (e) { return ""; }
+  }
+
+  function setView(name) {
+    if (name !== "inbox") name = "schedule";
+    document.getElementById("view").innerHTML = name === "inbox" ? renderInbox() : renderSchedule();
+    ["schedule", "inbox"].forEach(function (n) {
+      var tab = document.getElementById("tab-" + n);
+      if (n === name) tab.setAttribute("aria-current", "page"); else tab.removeAttribute("aria-current");
+    });
+    setCookie("hb_view", name);
+  }
+
+  // Tabs are plain <a href="#name"> so the widget can load them by URL (the hash is ignored by its cache).
+  Array.prototype.forEach.call(document.querySelectorAll(".tab"), function (a) {
+    a.addEventListener("click", function (ev) {
+      ev.preventDefault();
+      setView(a.getAttribute("href").slice(1));
+    });
+  });
+
+  var hash = (window.location.hash || "").replace("#", "");
+  setView(hash === "inbox" || hash === "schedule" ? hash : (getCookie("hb_view") || "schedule"));
+  renderWx();
+  loadLiveWeather();
+
+  document.getElementById("todayStamp").textContent = DAYS[now.getDay()] + " " + MONTHS[now.getMonth()] + " " + now.getDate();
+  if (todayKey > DATA_THROUGH) document.getElementById("wxNote").textContent = "Data is out of date";
+
+  // WidgetWeb hooks: wait a little longer only while the live forecast is still loading.
+  function __wweb2JsWidgetTitle() { return "Home Base"; }
+  function __wweb2WaitMillisecondsToWidgetIsReady(currentDelayMs) { return wxPending ? 600 : 0; }
+</script>
