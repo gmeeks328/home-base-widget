@@ -270,11 +270,12 @@
     for (var i = 0; i < px.length; i += 4) {
       if (px[i + 3] === 0) continue;
       var hsl = rgb2hsl(px[i], px[i + 1], px[i + 2]), h = hsl[0], s = hsl[1], l = hsl[2];
-      if (h >= 125 && h <= 265 && s > 0.03) { h = 208; s = Math.min(0.7, s * 2.6 + 0.35); l = l * 0.9; }   // water (incl. teal-gray ocean)
+      // Esri's land is very pale (high lightness) and its ocean is darker, even when both share a cool tint,
+      // so lightness decides water vs land and saturation decides dry (brown) vs vegetated (green).
+      if (h >= 125 && h <= 265 && s > 0.03 && l < 0.87) { h = 208; s = Math.min(0.75, s * 2.6 + 0.4); l = l * 0.92; }   // water
       else {
-        // land: low saturation reads as dry ground (brown), higher saturation as vegetation (green)
-        var t = Math.max(0, Math.min(1, (s - 0.07) / 0.18)); if (l < 0.62) t = Math.max(t, 0.7);
-        h = 30 + 80 * t; s = 0.30 + 0.25 * t; l = l * (0.97 - 0.07 * t);
+        var t = Math.max(0, Math.min(1, (s - 0.04) / 0.14)); if (l < 0.6) t = Math.max(t, 0.7);
+        h = 30 + 80 * t; s = 0.30 + 0.25 * t; l = Math.min(l, 0.9) * (0.93 - 0.1 * t);
       }
       var c = hsl2rgb(h, s, l);
       px[i] = c[0]; px[i + 1] = c[1]; px[i + 2] = c[2];
