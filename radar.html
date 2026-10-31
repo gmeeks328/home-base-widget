@@ -6,29 +6,33 @@
 <title>Waxahachie Radar</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
 <style>
-  /* Layout: full-bleed map, a small title chip top-left, one control bar pinned to the bottom. */
+  /* Layout: full-bleed map; title chip top-left, zoom + recenter top-right, one control bar at the bottom. */
   :root {
     --bg: #F3F6F5;
-    --surface: rgba(255, 255, 255, 0.92);
+    --surface: rgba(255, 255, 255, 0.94);
     --ink: #16211D;
     --ink-muted: #56685F;
     --line: #C4D0CA;
     --accent: #2F6E62;
     --accent-ink: #FFFFFF;
     --warn: #A6791F;
+    --label-bg: rgba(255, 255, 255, 0.8);
+    --label-ink: #1B2A25;
     --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
     --font-num: ui-monospace, "SF Mono", Menlo, monospace;
     color-scheme: light;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
-      --bg: #0F1613; --surface: rgba(21, 31, 27, 0.92); --ink: #E8EEEA; --ink-muted: #96A89F;
-      --line: #34443E; --accent: #74C2AC; --accent-ink: #0F1613; --warn: #DFB268; color-scheme: dark;
+      --bg: #0F1613; --surface: rgba(21, 31, 27, 0.94); --ink: #E8EEEA; --ink-muted: #96A89F;
+      --line: #34443E; --accent: #74C2AC; --accent-ink: #0F1613; --warn: #DFB268;
+      --label-bg: rgba(15, 22, 19, 0.72); --label-ink: #E8EEEA; color-scheme: dark;
     }
   }
   :root[data-theme="dark"] {
-    --bg: #0F1613; --surface: rgba(21, 31, 27, 0.92); --ink: #E8EEEA; --ink-muted: #96A89F;
-    --line: #34443E; --accent: #74C2AC; --accent-ink: #0F1613; --warn: #DFB268; color-scheme: dark;
+    --bg: #0F1613; --surface: rgba(21, 31, 27, 0.94); --ink: #E8EEEA; --ink-muted: #96A89F;
+    --line: #34443E; --accent: #74C2AC; --accent-ink: #0F1613; --warn: #DFB268;
+    --label-bg: rgba(15, 22, 19, 0.72); --label-ink: #E8EEEA; color-scheme: dark;
   }
 
   * { box-sizing: border-box; }
@@ -47,12 +51,24 @@
   .chip {
     top: max(12px, env(safe-area-inset-top, 0px));
     left: max(12px, env(safe-area-inset-left, 0px));
-    padding: 7px 12px;
+    padding: 7px 13px 7px 12px;
     border-radius: 100px;
+    display: flex; align-items: baseline; gap: 7px;
     font-weight: 700;
     letter-spacing: -0.01em;
   }
-  .chip small { font-family: var(--font-num); font-weight: 400; color: var(--ink-muted); margin-left: 6px; font-size: 11.5px; }
+  .chip small { font-weight: 500; color: var(--ink-muted); font-size: 12.5px; letter-spacing: 0; }
+
+  /* Leaflet controls, restyled and moved clear of the notch and the bottom bar */
+  .leaflet-top { top: max(12px, env(safe-area-inset-top, 0px)); }
+  .leaflet-right { right: max(12px, env(safe-area-inset-right, 0px)); }
+  .leaflet-bottom { bottom: calc(max(12px, env(safe-area-inset-bottom, 0px)) + 92px); }
+  .leaflet-left { left: max(12px, env(safe-area-inset-left, 0px)); }
+  .leaflet-touch .leaflet-bar { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; box-shadow: none; }
+  .leaflet-bar a, .leaflet-bar a:hover { background: var(--surface); color: var(--ink); border-bottom-color: var(--line); width: 40px; height: 40px; line-height: 40px; font-size: 20px; }
+  .leaflet-bar a.recenter { font-size: 18px; text-decoration: none; text-align: center; display: block; }
+  .leaflet-control-attribution { font-size: 10px; background: var(--surface) !important; color: var(--ink-muted); border-radius: 8px 0 0 0; }
+  .leaflet-control-attribution a { color: var(--ink-muted); }
 
   .bar {
     left: max(12px, env(safe-area-inset-left, 0px));
@@ -61,27 +77,33 @@
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
-    gap: 12px;
-    padding: 10px 14px;
-    border-radius: 16px;
+    gap: 14px;
+    padding: 11px 16px 10px 12px;
+    border-radius: 18px;
     max-width: 560px;
     margin: 0 auto;
   }
   button#play {
-    width: 40px; height: 40px;
+    width: 46px; height: 46px;
     border-radius: 50%;
     border: none;
     background: var(--accent);
     color: var(--accent-ink);
-    font-size: 15px;
+    font-size: 16px;
     cursor: pointer;
   }
-  button#play:focus-visible, input[type="range"]:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
-  input[type="range"] { width: 100%; accent-color: var(--accent); margin: 0; }
-  .when { text-align: right; min-width: 78px; }
-  .when b { display: block; font-family: var(--font-num); font-size: 15px; font-weight: 500; font-variant-numeric: tabular-nums; }
-  .when span { font-size: 11px; color: var(--ink-muted); }
-  .when span.fc { color: var(--warn); font-weight: 600; }
+  button#play:focus-visible, input[type="range"]:focus-visible, .leaflet-bar a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  .mid { min-width: 0; }
+  input[type="range"] { width: 100%; accent-color: var(--accent); margin: 0; display: block; }
+  .ticks { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 3px; font-family: var(--font-num); font-size: 10.5px; color: var(--ink-muted); }
+  .legend { display: flex; align-items: center; gap: 5px; }
+  .legend i { display: block; width: 54px; height: 6px; border-radius: 6px; background: linear-gradient(90deg, #7be07b, #2da02d, #f4e842, #f59b2f, #e0302a, #c21fb4); }
+  .legend[hidden] { display: none; }
+
+  .when { text-align: right; min-width: 88px; }
+  .when b { display: block; font-family: var(--font-num); font-size: 18px; font-weight: 500; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+  .when span { font-size: 12px; color: var(--ink-muted); }
+  .when span.fc { color: var(--warn); font-weight: 700; }
 
   .msg {
     position: absolute; z-index: 1001; left: 50%; top: 50%; transform: translate(-50%, -50%);
@@ -91,9 +113,29 @@
   }
   .msg[hidden] { display: none; }
 
-  .dot-marker { width: 14px; height: 14px; border-radius: 50%; background: var(--accent); border: 3px solid var(--surface); box-shadow: 0 0 0 1px var(--ink-muted); }
-  .leaflet-control-attribution { font-size: 10px; }
-  .leaflet-bottom.leaflet-right { bottom: 78px; }
+  /* Place names: centered on their point; pill background keeps them readable over radar */
+  .anchor { width: 0; height: 0; }
+  .city {
+    position: absolute; left: 0; top: 0; transform: translate(-50%, -50%);
+    white-space: nowrap;
+    padding: 1px 6px;
+    border-radius: 7px;
+    background: var(--label-bg);
+    color: var(--label-ink);
+    font-weight: 600;
+    pointer-events: none;
+  }
+  .city.t1 { font-size: 13px; font-weight: 700; }
+  .city.t2 { font-size: 11.5px; }
+  .city.t3 { font-size: 10.5px; color: var(--ink-muted); font-weight: 500; }
+
+  .home { position: absolute; left: 0; top: 0; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 3px; pointer-events: none; }
+  .home i { display: block; width: 16px; height: 16px; border-radius: 50%; background: var(--accent); border: 3px solid var(--surface); box-shadow: 0 0 0 1.5px var(--accent), 0 2px 6px rgba(0,0,0,0.25); }
+  .home b { padding: 2px 8px; border-radius: 8px; background: var(--accent); color: var(--accent-ink); font-size: 12px; font-weight: 700; }
+  @media (prefers-reduced-motion: no-preference) {
+    .home i { animation: pulse 2.4s ease-out infinite; }
+    @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(47,110,98,0.5), 0 2px 6px rgba(0,0,0,0.25); } 70% { box-shadow: 0 0 0 14px rgba(47,110,98,0), 0 2px 6px rgba(0,0,0,0.25); } 100% { box-shadow: 0 0 0 0 rgba(47,110,98,0), 0 2px 6px rgba(0,0,0,0.25); } }
+  }
 </style>
 </head>
 <body>
@@ -105,69 +147,135 @@
 
   <div class="bar">
     <button id="play" type="button" aria-label="Pause">❚❚</button>
-    <input id="slider" type="range" min="0" max="0" value="0" step="1" aria-label="Radar frame">
+    <div class="mid">
+      <input id="slider" type="range" min="0" max="0" value="0" step="1" aria-label="Radar frame">
+      <div class="ticks"><span id="t0">&nbsp;</span><span class="legend" id="legend" hidden>light <i></i> heavy</span><span id="t1">&nbsp;</span></div>
+    </div>
     <div class="when"><b id="t">--:--</b><span id="rel">loading</span></div>
   </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
 <script>
   var HOME = [32.386, -96.848];
+  var HOME_ZOOM = 8;
   var FEED = "https://api.rainviewer.com/public/weather-maps.json";
-  var FRAME_MS = 650;
+  var FRAME_MS = 600;
   var HOLD_MS = 1800;
   var REFRESH_MS = 5 * 60 * 1000;
-  // Radar tiles stop at a modest native zoom; Leaflet scales them up beyond that.
   var RADAR_NATIVE_ZOOM = 7;
+  var SCHEME = 6;           // NEXRAD-style greens to reds; falls back to 2 (blue) if those tiles will not load
+  var RADAR_OPACITY = 0.85;
 
-  var map = L.map("map", { center: HOME, zoom: 7, minZoom: 4, maxZoom: 10, zoomControl: true });
-  // Place names sit in their own pane above the radar so rain never covers them.
-  map.createPane("labels");
-  map.getPane("labels").style.zIndex = 450;
-  map.getPane("labels").style.pointerEvents = "none";
+  var map = L.map("map", { center: HOME, zoom: HOME_ZOOM, minZoom: 5, maxZoom: 10, zoomControl: false, attributionControl: false });
+  L.control.zoom({ position: "topright" }).addTo(map);
+  L.control.attribution({ position: "bottomright", prefix: '<a href="https://leafletjs.com">Leaflet</a>' }).addTo(map);
 
+  // Recenter button under the zoom buttons
+  var Recenter = L.Control.extend({
+    options: { position: "topright" },
+    onAdd: function () {
+      var box = L.DomUtil.create("div", "leaflet-bar");
+      var a = L.DomUtil.create("a", "recenter", box);
+      a.href = "#"; a.title = "Back to Waxahachie"; a.setAttribute("role", "button"); a.setAttribute("aria-label", "Back to Waxahachie");
+      a.innerHTML = "&#9678;";
+      L.DomEvent.disableClickPropagation(box);
+      L.DomEvent.on(a, "click", function (e) { L.DomEvent.preventDefault(e); map.flyTo(HOME, HOME_ZOOM, { duration: 0.6 }); });
+      return box;
+    }
+  });
+  new Recenter().addTo(map);
+
+  // ---- basemap (keyless): Esri gray, OpenStreetMap if Esri tiles refuse to load ----
   var dark = window.matchMedia("(prefers-color-scheme: dark)");
   var theme = document.documentElement.getAttribute("data-theme");
   function wantsDark() { return theme ? theme === "dark" : dark.matches; }
-  var baseLayer = null;
-  // Keyless basemaps: Esri light/dark gray first; if its tiles refuse to load, fall back to OpenStreetMap.
   var ESRI = "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/";
+  var baseLayer = null;
   var useOsm = false;
-  var labelLayer = null;
   function setBase() {
     if (baseLayer) map.removeLayer(baseLayer);
-    if (labelLayer) { map.removeLayer(labelLayer); labelLayer = null; }
     var credit = ' | Radar: <a href="https://www.rainviewer.com/">RainViewer</a>';
     if (useOsm) {
       baseLayer = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        maxZoom: 19,
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' + credit
+        maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' + credit
       });
     } else {
       var loaded = 0, errors = 0;
       baseLayer = L.tileLayer(ESRI + (wantsDark() ? "World_Dark_Gray_Base" : "World_Light_Gray_Base") + "/MapServer/tile/{z}/{y}/{x}", {
-        maxZoom: 16,
-        attribution: 'Tiles &copy; Esri' + credit
+        maxZoom: 16, attribution: 'Tiles &copy; Esri' + credit
       });
       baseLayer.on("tileload", function () { loaded++; });
       baseLayer.on("tileerror", function () {
         errors++;
-        if (!loaded && errors >= 4 && !useOsm) { useOsm = true; setBase(); }
+        if (!loaded && errors >= 4 && !useOsm) { useOsm = true; setBase(); applyLabelMode(); }
       });
     }
     baseLayer.addTo(map);
     baseLayer.bringToBack();
-    if (!useOsm) {
-      // OpenStreetMap tiles already carry names; Esri's gray base needs the separate reference layer.
-      labelLayer = L.tileLayer(ESRI + (wantsDark() ? "World_Dark_Gray_Reference" : "World_Light_Gray_Reference") + "/MapServer/tile/{z}/{y}/{x}", {
-        pane: "labels", maxZoom: 16
-      }).addTo(map);
-    }
   }
   setBase();
   if (dark.addEventListener) dark.addEventListener("change", setBase);
 
-  L.marker(HOME, { icon: L.divIcon({ className: "", html: '<div class="dot-marker"></div>', iconSize: [14, 14], iconAnchor: [7, 7] }), keyboard: false, interactive: false }).addTo(map);
+  // ---- place names: our own, decluttered so they never overlap ----
+  // [name, lat, lon, tier]  tier 1 shows from zoom 6, tier 2 from 8, tier 3 from 9
+  var CITIES = [
+    ["Dallas", 32.7767, -96.7970, 1], ["Fort Worth", 32.7555, -97.3308, 1], ["Waco", 31.5493, -97.1467, 1],
+    ["Tyler", 32.3513, -95.3011, 1], ["Austin", 30.2672, -97.7431, 1], ["Houston", 29.7604, -95.3698, 1],
+    ["Killeen", 31.1171, -97.7278, 1], ["Longview", 32.5007, -94.7405, 1],
+    ["Arlington", 32.7357, -97.1081, 2], ["Plano", 33.0198, -96.6989, 2], ["Denton", 33.2148, -97.1331, 2],
+    ["Corsicana", 32.0954, -96.4689, 2], ["Cleburne", 32.3476, -97.3867, 2], ["Temple", 31.0982, -97.3428, 2],
+    ["Sherman", 33.6357, -96.6089, 2], ["Greenville", 33.1384, -96.1106, 2], ["Weatherford", 32.7593, -97.7976, 2],
+    ["Palestine", 31.7621, -95.6308, 2], ["Bryan", 30.6744, -96.3699, 2], ["McKinney", 33.1972, -96.6398, 2],
+    ["Ennis", 32.3293, -96.6253, 3], ["Midlothian", 32.4824, -96.9945, 3], ["Mansfield", 32.5632, -97.1417, 3],
+    ["Hillsboro", 32.0118, -97.1250, 3], ["Terrell", 32.7360, -96.2753, 3], ["Athens", 32.2049, -95.8555, 3],
+    ["Mexia", 31.6799, -96.4822, 3], ["Lancaster", 32.5921, -96.7561, 3], ["Cedar Hill", 32.5885, -96.9561, 3],
+    ["Rockwall", 32.9312, -96.4597, 3], ["Granbury", 32.4421, -97.7942, 3], ["Red Oak", 32.5176, -96.8044, 3]
+  ];
+  var TIER_ZOOM = { 1: 6, 2: 8, 3: 9 };
 
+  var homeMarker = L.marker(HOME, {
+    icon: L.divIcon({ className: "anchor", html: '<div class="home"><i></i><b>Waxahachie</b></div>', iconSize: [0, 0] }),
+    interactive: false, keyboard: false, zIndexOffset: 1000
+  }).addTo(map);
+
+  var cityMarkers = CITIES.map(function (c) {
+    var m = L.marker([c[1], c[2]], {
+      icon: L.divIcon({ className: "anchor", html: '<span class="city t' + c[3] + '">' + c[0] + '</span>', iconSize: [0, 0] }),
+      interactive: false, keyboard: false
+    }).addTo(map);
+    return { marker: m, minZoom: TIER_ZOOM[c[3]] };
+  });
+
+  function applyLabelMode() {
+    // OpenStreetMap tiles already carry names, so hide ours in that fallback.
+    var show = !useOsm;
+    cityMarkers.forEach(function (c) { var el = c.marker.getElement(); if (el) el.style.visibility = show ? "" : "hidden"; });
+    if (show) declutter();
+  }
+
+  function declutter() {
+    if (useOsm) return;
+    var z = map.getZoom();
+    var placed = [];
+    var hEl = homeMarker.getElement();
+    if (hEl) placed.push(hEl.getBoundingClientRect());
+    var mapRect = document.getElementById("map").getBoundingClientRect();
+    cityMarkers.forEach(function (c) {
+      var el = c.marker.getElement();
+      if (!el) return;
+      if (z < c.minZoom) { el.style.display = "none"; return; }
+      el.style.display = "";
+      var r = el.firstChild.getBoundingClientRect();
+      var offscreen = r.right < mapRect.left || r.left > mapRect.right || r.bottom < mapRect.top || r.top > mapRect.bottom;
+      var pad = 4;
+      var clash = placed.some(function (p) { return r.left < p.right + pad && r.right > p.left - pad && r.top < p.bottom + pad && r.bottom > p.top - pad; });
+      if (clash || offscreen) { el.style.display = "none"; } else { placed.push(r); }
+    });
+  }
+  map.on("zoomend moveend", declutter);
+  setTimeout(declutter, 0);
+
+  // ---- radar ----
   var frames = [];
   var layers = [];
   var current = 0;
@@ -178,30 +286,30 @@
   var playBtn = document.getElementById("play");
   var tEl = document.getElementById("t");
   var relEl = document.getElementById("rel");
+  var t0El = document.getElementById("t0");
+  var t1El = document.getElementById("t1");
+  var legend = document.getElementById("legend");
   var msg = document.getElementById("msg");
 
   function showMsg(text) { msg.textContent = text; msg.hidden = false; }
   function hideMsg() { msg.hidden = true; }
+  function clock(sec) { return new Date(sec * 1000).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }); }
 
-  function clearLayers() {
-    layers.forEach(function (l) { map.removeLayer(l); });
-    layers = [];
-  }
+  function clearLayers() { layers.forEach(function (l) { map.removeLayer(l); }); layers = []; }
 
   function show(i) {
     if (!layers.length) return;
     current = i;
-    layers.forEach(function (l, idx) { l.setOpacity(idx === i ? 0.75 : 0); });
+    layers.forEach(function (l, idx) { l.setOpacity(idx === i ? RADAR_OPACITY : 0); });
     slider.value = i;
     var f = frames[i];
-    var d = new Date(f.time * 1000);
-    tEl.textContent = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    tEl.textContent = clock(f.time);
     var mins = Math.round((f.time * 1000 - Date.now()) / 60000);
     if (f.nowcast) {
       relEl.textContent = "forecast +" + Math.max(mins, 0) + " min";
       relEl.className = "fc";
     } else {
-      relEl.textContent = mins >= -1 ? "now" : Math.abs(mins) + " min ago";
+      relEl.textContent = mins >= -2 ? "now" : Math.abs(mins) + " min ago";
       relEl.className = "";
     }
   }
@@ -237,15 +345,23 @@
         var wasLast = frames.length && current === frames.length - 1;
         clearLayers();
         frames = list;
-        // Color scheme 2, smoothed, snow shown: /256/{z}/{x}/{y}/2/1_1.png
+        var loaded = 0, errors = 0;
         layers = frames.map(function (f) {
-          return L.tileLayer(host + f.path + "/256/{z}/{x}/{y}/2/1_1.png", {
+          var l = L.tileLayer(host + f.path + "/256/{z}/{x}/{y}/" + SCHEME + "/1_1.png", {
             opacity: 0, maxNativeZoom: RADAR_NATIVE_ZOOM, maxZoom: 10, tileSize: 256, zIndex: 400
-          }).addTo(map);
+          });
+          l.on("tileload", function () { loaded++; });
+          l.on("tileerror", function () {
+            errors++;
+            if (!loaded && errors >= 6 && SCHEME !== 2) { SCHEME = 2; load(); }
+          });
+          return l.addTo(map);
         });
+        legend.hidden = SCHEME !== 6;
         slider.max = frames.length - 1;
+        t0El.textContent = clock(frames[0].time);
+        t1El.textContent = clock(frames[frames.length - 1].time);
         hideMsg();
-        // Start on the newest observed frame, not the forecast.
         var lastPast = 0;
         frames.forEach(function (f, i) { if (!f.nowcast) lastPast = i; });
         show(wasLast ? lastPast : Math.min(current, frames.length - 1) || 0);
