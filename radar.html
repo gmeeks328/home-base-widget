@@ -16,8 +16,8 @@
     --accent: #2F6E62;
     --accent-ink: #FFFFFF;
     --warn: #A6791F;
-    --label-bg: rgba(255, 255, 255, 0.8);
-    --label-ink: #1B2A25;
+    --label-bg: rgba(233, 244, 238, 0.95);
+    --label-ink: #1F4E45;
     --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
     --font-num: ui-monospace, "SF Mono", Menlo, monospace;
     color-scheme: light;
@@ -26,13 +26,13 @@
     :root:not([data-theme="light"]) {
       --bg: #0F1613; --surface: rgba(21, 31, 27, 0.94); --ink: #E8EEEA; --ink-muted: #96A89F;
       --line: #34443E; --accent: #74C2AC; --accent-ink: #0F1613; --warn: #DFB268;
-      --label-bg: rgba(15, 22, 19, 0.72); --label-ink: #E8EEEA; color-scheme: dark;
+      --label-bg: rgba(18, 30, 25, 0.9); --label-ink: #CFEBE1; color-scheme: dark;
     }
   }
   :root[data-theme="dark"] {
     --bg: #0F1613; --surface: rgba(21, 31, 27, 0.94); --ink: #E8EEEA; --ink-muted: #96A89F;
     --line: #34443E; --accent: #74C2AC; --accent-ink: #0F1613; --warn: #DFB268;
-    --label-bg: rgba(15, 22, 19, 0.72); --label-ink: #E8EEEA; color-scheme: dark;
+    --label-bg: rgba(18, 30, 25, 0.9); --label-ink: #CFEBE1; color-scheme: dark;
   }
 
   * { box-sizing: border-box; }
@@ -139,6 +139,7 @@
     background: var(--label-bg);
     color: var(--label-ink);
     font-weight: 600;
+    box-shadow: 0 0 0 1px rgba(47, 110, 98, 0.28);
     pointer-events: none;
   }
   .city.t1 { font-size: 13px; font-weight: 700; }
@@ -242,7 +243,7 @@
   function wantsDark() { return theme ? theme === "dark" : dark.matches; }
   var SERVICES = "https://server.arcgisonline.com/ArcGIS/rest/services/";
   var STYLES = [
-    { id: "streets", name: "Streets", labels: false },
+    { id: "streets", name: "Streets", labels: true },
     { id: "satellite", name: "Satellite", labels: true },
     { id: "gray", name: "Light gray", labels: true }
   ];
@@ -315,7 +316,7 @@
   });
 
   function applyLabelMode() {
-    // Streets and OpenStreetMap tiles already carry names, so ours show only on satellite and gray.
+    // Our green name tags show on every Esri style; only the OpenStreetMap fallback carries its own names.
     if (!labelsOn()) {
       cityMarkers.forEach(function (c) { var el = c.marker.getElement(); if (el) el.style.display = "none"; });
       return;
