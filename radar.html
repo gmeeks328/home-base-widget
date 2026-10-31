@@ -316,7 +316,9 @@
   function applyBaseFilter() {
     var invert = wantsDark() && useOsm;
     var fx = [];
-        if (invert) fx.push("invert(1) hue-rotate(180deg) brightness(0.9) contrast(0.95)");
+        // The topographic map is pale by design; push its greens, blues and tans so land, water and roads separate clearly.
+    if (!useOsm && style().id === "terrain") fx.push("saturate(2.2) contrast(1.12) brightness(0.98)");
+    if (invert) fx.push("invert(1) hue-rotate(180deg) brightness(0.9) contrast(0.95)");
     map.getPane("base").style.filter = fx.length ? fx.join(" ") : "none";
   }
   var STYLES = [
