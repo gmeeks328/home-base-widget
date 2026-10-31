@@ -516,9 +516,12 @@
 
   // WidgetWeb hooks: wait a little longer only while the live forecast is still loading.
   function __wweb2JsWidgetTitle() { return "Home Base"; }
+  // WidgetWeb calls this over and over and always passes currentDelayMs=0, so the time cap has to be tracked here.
+  // Return 0 as soon as the page is ready; any other number means "check again in that many ms".
+  var PAGE_T0 = Date.now();
   function __wweb2WaitMillisecondsToWidgetIsReady(currentDelayMs) {
-    if (currentDelayMs > 6000) return 0;
-    if (document.body.classList.contains("radar")) return (radarPending || RADAR.pending > 0) ? 500 : 400;
+    if (Date.now() - PAGE_T0 > 12000) return 0;
+    if (document.body.classList.contains("radar")) return (radarPending || RADAR.pending > 0) ? 500 : 0;
     return wxPending ? 600 : 0;
   }
 </script>
