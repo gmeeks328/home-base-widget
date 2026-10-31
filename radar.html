@@ -120,6 +120,10 @@
   var RADAR_NATIVE_ZOOM = 7;
 
   var map = L.map("map", { center: HOME, zoom: 7, minZoom: 4, maxZoom: 10, zoomControl: true });
+  // Place names sit in their own pane above the radar so rain never covers them.
+  map.createPane("labels");
+  map.getPane("labels").style.zIndex = 450;
+  map.getPane("labels").style.pointerEvents = "none";
 
   var dark = window.matchMedia("(prefers-color-scheme: dark)");
   var theme = document.documentElement.getAttribute("data-theme");
@@ -128,8 +132,10 @@
   // Keyless basemaps: Esri light/dark gray first; if its tiles refuse to load, fall back to OpenStreetMap.
   var ESRI = "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/";
   var useOsm = false;
+  var labelLayer = null;
   function setBase() {
     if (baseLayer) map.removeLayer(baseLayer);
+    if (labelLayer) { map.removeLayer(labelLayer); labelLayer = null; }
     var credit = ' | Radar: <a href="https://www.rainviewer.com/">RainViewer</a>';
     if (useOsm) {
       baseLayer = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -150,6 +156,12 @@
     }
     baseLayer.addTo(map);
     baseLayer.bringToBack();
+    if (!useOsm) {
+      // OpenStreetMap tiles already carry names; Esri's gray base needs the separate reference layer.
+      labelLayer = L.tileLayer(ESRI + (wantsDark() ? "World_Dark_Gray_Reference" : "World_Light_Gray_Reference") + "/MapServer/tile/{z}/{y}/{x}", {
+        pane: "labels", maxZoom: 16
+      }).addTo(map);
+    }
   }
   setBase();
   if (dark.addEventListener) dark.addEventListener("change", setBase);
