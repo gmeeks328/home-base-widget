@@ -314,14 +314,13 @@
   });
   // If the browser will not let us read the tile pixels, fall back to a plain saturation boost.
   function applyBaseFilter() {
-    var invert = wantsDark() && (useOsm || style().id === "terrain");
+    var invert = wantsDark() && useOsm;
     var fx = [];
-    if (!useOsm && style().id === "terrain" && !recolorOk) fx.push("saturate(1.7) contrast(1.06)");
-    if (invert) fx.push("invert(1) hue-rotate(180deg) brightness(0.9) contrast(0.95)");
+        if (invert) fx.push("invert(1) hue-rotate(180deg) brightness(0.9) contrast(0.95)");
     map.getPane("base").style.filter = fx.length ? fx.join(" ") : "none";
   }
   var STYLES = [
-    { id: "terrain", name: "Terrain & roads", labels: true },
+    { id: "terrain", name: "Topographic", labels: false },
     { id: "satellite", name: "Satellite", labels: true },
     { id: "gray", name: "Light gray", labels: true }
   ];
@@ -349,21 +348,19 @@
         pane: "base", maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' + credit
       });
     } else if (style().id === "terrain") {
-      // Shaded terrain with water, plus major highways only. No baked-in town names, so our green tags are the only text.
+      // Esri's topographic map: green vegetation, tan land, blue water, with its own roads and names baked in.
       var tLoaded = 0, tErrors = 0;
-      var tb = new RecolorTerrain({ pane: "base", maxZoom: 19, zIndex: 1, attribution: 'Tiles &copy; Esri' + credit });
-      var roads = L.tileLayer(SERVICES + "Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}", { pane: "base", maxZoom: 19, zIndex: 2 });
-      tb.on("tileload", function () { tLoaded++; });
-      tb.on("tileerror", function () {
+      baseLayer = L.tileLayer(SERVICES + "World_Topo_Map/MapServer/tile/{z}/{y}/{x}", { pane: "base", maxZoom: 19, attribution: 'Tiles &copy; Esri' + credit });
+      baseLayer.on("tileload", function () { tLoaded++; });
+      baseLayer.on("tileerror", function () {
         tErrors++;
         if (!tLoaded && tErrors >= 4 && style().id === "terrain") {
           styleIdx = styleIndex("gray");
           setBase();
           styleSync();
-          toast("Terrain not available, showing Light gray");
+          toast("Topographic not available, showing Light gray");
         }
       });
-      baseLayer = L.layerGroup([tb, roads]);
     } else {
       var loaded = 0, errors = 0;
       baseLayer = L.tileLayer(tileUrl(), { pane: "base", maxZoom: 19, attribution: 'Tiles &copy; Esri' + credit });
