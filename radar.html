@@ -248,6 +248,7 @@
 
   // ---- terrain recoloring: water to blue, vegetation to green, bare land to brown, keeping the relief shading ----
   var recolorOk = true;
+  var GREEN_BOOST = 2.2;   // raise for richer greens, lower for paler
   function rgb2hsl(r, g, b) {
     r /= 255; g /= 255; b /= 255;
     var mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2, h = 0, s = 0, d = mx - mn;
@@ -271,13 +272,9 @@
     for (var i = 0; i < px.length; i += 4) {
       if (px[i + 3] === 0) continue;
       var hsl = rgb2hsl(px[i], px[i + 1], px[i + 2]), h = hsl[0], s = hsl[1], l = hsl[2];
-      // Esri's land is very pale (high lightness) and its ocean is darker, even when both share a cool tint,
-      // so lightness decides water vs land and saturation decides dry (brown) vs vegetated (green).
-      if (h >= 125 && h <= 265 && s > 0.03 && l < 0.87) { h = 208; s = Math.min(0.75, s * 2.6 + 0.4); l = l * 0.92; }   // water
-      else {
-        var t = Math.max(0, Math.min(1, (s - 0.04) / 0.14)); if (l < 0.6) t = Math.max(t, 0.7);
-        h = 30 + 80 * t; s = 0.30 + 0.25 * t; l = Math.min(l, 0.9) * (0.93 - 0.1 * t);
-      }
+      // Only vegetation greens are touched; water, roads, land tan and text keep Esri's own colors.
+      if (h < 55 || h > 170 || s < 0.05) continue;
+      s = Math.min(0.6, s * GREEN_BOOST + 0.04); h = h + (112 - h) * 0.45; l = l * 0.97;
       var c = hsl2rgb(h, s, l);
       px[i] = c[0]; px[i + 1] = c[1]; px[i + 2] = c[2];
     }
@@ -287,7 +284,7 @@
       var size = this.getTileSize();
       var tile = L.DomUtil.create("canvas", "leaflet-tile");
       tile.width = size.x; tile.height = size.y;
-      var url = L.Util.template(SERVICES + "World_Terrain_Base/MapServer/tile/{z}/{y}/{x}", coords);
+      var url = L.Util.template(SERVICES + "World_Topo_Map/MapServer/tile/{z}/{y}/{x}", coords);
       function paint(img, canRecolor) {
         var ctx = tile.getContext("2d");
         ctx.drawImage(img, 0, 0, size.x, size.y);
@@ -317,8 +314,7 @@
   function applyBaseFilter() {
     var invert = wantsDark() && useOsm;
     var fx = [];
-        // The topographic map is pale by design; push its greens, blues and tans so land, water and roads separate clearly.
-    if (!useOsm && style().id === "terrain") fx.push("hue-rotate(14deg) saturate(2.6) contrast(1.12) brightness(0.98)");  // hue shift nudges yellow-greens toward true green; plain CSS so every browser applies it
+    if (!useOsm && style().id === "terrain" && !recolorOk) fx.push("saturate(1.25)");  // only if the browser blocks reading tile pixels
     if (invert) fx.push("invert(1) hue-rotate(180deg) brightness(0.9) contrast(0.95)");
     map.getPane("base").style.filter = fx.length ? fx.join(" ") : "none";
   }
@@ -353,7 +349,7 @@
     } else if (style().id === "terrain") {
       // Esri's topographic map: green vegetation, tan land, blue water, with its own roads and names baked in.
       var tLoaded = 0, tErrors = 0;
-      baseLayer = L.tileLayer(SERVICES + "World_Topo_Map/MapServer/tile/{z}/{y}/{x}", { pane: "base", maxZoom: 19, attribution: 'Tiles &copy; Esri' + credit });
+      baseLayer = new RecolorTerrain({ pane: "base", maxZoom: 19, attribution: 'Tiles &copy; Esri' + credit });
       baseLayer.on("tileload", function () { tLoaded++; });
       baseLayer.on("tileerror", function () {
         tErrors++;
