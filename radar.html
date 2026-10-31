@@ -156,6 +156,7 @@
 </style>
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><filter id="greenBoost" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="1 0 0 0 0  -0.25 1.5 -0.25 0 0  0 0 1 0 0"/></filter></svg>
   <div id="map" role="application" aria-label="Weather radar map"></div>
 
   <div class="chip">Radar<small>Waxahachie, TX</small></div>
@@ -317,7 +318,7 @@
     var invert = wantsDark() && useOsm;
     var fx = [];
         // The topographic map is pale by design; push its greens, blues and tans so land, water and roads separate clearly.
-    if (!useOsm && style().id === "terrain") fx.push("saturate(2.2) contrast(1.12) brightness(0.98)");
+    if (!useOsm && style().id === "terrain") fx.push("url(#greenBoost) saturate(2.2) contrast(1.12) brightness(0.98)");  // greenBoost lifts greens only; grays and blues are left alone
     if (invert) fx.push("invert(1) hue-rotate(180deg) brightness(0.9) contrast(0.95)");
     map.getPane("base").style.filter = fx.length ? fx.join(" ") : "none";
   }
