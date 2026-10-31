@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Radar Widget</title>
+<meta name="js-widget-title" content="Radar">
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css">
+<style>
+  :root { --accent: #2F6E62; --blue: #2F6FD0; --ink: #1d2a27; --surface: rgba(255,255,255,0.94); --line: rgba(0,0,0,0.12); }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #e8efe9; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; }
+  #map { position: absolute; inset: 0; background: #e8efe9; }
+  .leaflet-container { font: inherit; background: #e8efe9; }
+  .anchor { background: none; border: none; }
+  .home { position: absolute; left: 0; top: 0; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 3px; }
+  .home i { display: block; width: 14px; height: 14px; border-radius: 50%; background: var(--blue); border: 3px solid #fff; box-shadow: 0 0 0 1.5px var(--blue), 0 2px 6px rgba(0,0,0,0.25); }
+  .home b { padding: 2px 8px; border-radius: 8px; background: var(--blue); color: #fff; font-size: 11px; font-weight: 700; white-space: nowrap; }
+  .chip { position: absolute; z-index: 800; top: 8px; left: 8px; padding: 4px 10px; border-radius: 100px; background: var(--surface); border: 1px solid var(--line); font-size: 12px; font-weight: 700; color: var(--ink); }
+  .legend { position: absolute; z-index: 800; top: 8px; right: 8px; padding: 4px 8px; border-radius: 100px; background: var(--surface); border: 1px solid var(--line); font-size: 10px; color: #555; display: flex; align-items: center; gap: 5px; }
+  .legend i { display: block; width: 44px; height: 6px; border-radius: 3px; background: linear-gradient(90deg, #3aa845, #f0e030, #f08020, #d02020, #b020a0); }
+  .bar { position: absolute; z-index: 800; left: 8px; right: 8px; bottom: 8px; display: flex; align-items: center; gap: 8px; padding: 6px; border-radius: 100px; background: var(--surface); border: 1px solid var(--line); }
+  .step { flex: 0 0 auto; width: 44px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 100px; border: 1px solid var(--line); color: var(--accent); font-size: 18px; font-weight: 700; text-decoration: none;
+    --wweb2-overlay-btn-color: rgba(0, 0, 0, 0);
+    --wweb2-overlay-btn-press-color: rgba(47, 110, 98, 0.25);
+    --wweb2-overlay-btn-corner-radius: 100px; }
+  .step.off { opacity: 0.3; }
+  .when { flex: 1; text-align: center; line-height: 1.15; color: var(--ink); }
+  .when b { display: block; font-size: 15px; font-variant-numeric: tabular-nums; }
+  .when small { font-size: 11px; color: #666; }
+  .credit { position: absolute; z-index: 700; right: 10px; bottom: 58px; font-size: 8px; color: #555; background: rgba(255,255,255,0.7); padding: 0 4px; border-radius: 4px; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div class="chip" id="chip">Radar</div>
+<div class="legend"><span>light</span><i></i><span>heavy</span></div>
+<div class="credit">Esri | RainViewer</div>
+<div class="bar">
+  <a class="step off" id="older" aria-label="Earlier frame">&#9664;</a>
+  <div class="when"><b id="clock">--</b><small id="rel">loading radar</small></div>
+  <a class="step off" id="newer" aria-label="Later frame">&#9654;</a>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+(function () {
+  // Where the map is centered. No location prompt: iOS would ask every time the widget refreshes.
+  // To use another place, add ?lat=..&lon=..&name=.. to the widget URL.
+  var q = new URLSearchParams(window.location.search);
+  var HOME = [parseFloat(q.get("lat")) || 32.386, parseFloat(q.get("lon")) || -96.848];
+  var NAME = q.get("name") || "Waxahachie";
+  var ZOOM = 8;
+  var SERVICES = "https://server.arcgisonline.com/ArcGIS/rest/services/";
+  var FEED = "https://api.rainviewer.com/public/weather-maps.json";
+  var SCHEME = 6, RADAR_OPACITY = 0.85;
+  var pending = 0, feedDone = false;
+
+  var map = L.map("map", { center: HOME, zoom: ZOOM, zoomControl: false, attributionControl: false, dragging: false, touchZoom: false, scrollWheelZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false });
+  map.createPane("base").style.zIndex = 150;
+  document.getElementById("chip").textContent = "Radar \u00b7 " + NAME;
+
+  function applyBaseFilter() {
+    // If the browser blocks reading tile pixels, fall back to a mild overall color boost.
+    map.getPane("base").style.filter = recolorOk ? "none" : "saturate(1.25)";
+  }
+  var recolorOk = true;
+  var GREEN_BOOST = 3.4;   // raise for richer greens, lower for paler
+  function rgb2hsl(r, g, b) {
+    r /= 255; g /= 255; b /= 255;
+    var mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2, h = 0, s = 0, d = mx - mn;
+    if (d) {
+      s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
+      if (mx === r) h = (g - b) / d + (g < b ? 6 : 0);
+      else if (mx === g) h = (b - r) / d + 2;
+      else h = (r - g) / d + 4;
+      h *= 60;
+    }
+    return [h, s, l];
+  }
+  function hsl2rgb(h, s, l) {
+    var c = (1 - Math.abs(2 * l - 1)) * s, hp = h / 60, x = c * (1 - Math.abs(hp % 2 - 1)), r = 0, g = 0, b = 0;
+    if (hp < 1) { r = c; g = x; } else if (hp < 2) { r = x; g = c; } else if (hp < 3) { g = c; b = x; }
+    else if (hp < 4) { g = x; b = c; } else if (hp < 5) { r = x; b = c; } else { r = c; b = x; }
+    var m = l - c / 2;
+    return [Math.round((r + m) * 255), Math.round((g + m) * 255), Math.round((b + m) * 255)];
+  }
+  function recolor(px) {
+    for (var i = 0; i < px.length; i += 4) {
+      if (px[i + 3] === 0) continue;
+      var hsl = rgb2hsl(px[i], px[i + 1], px[i + 2]), h = hsl[0], s = hsl[1], l = hsl[2];
+      // Only vegetation greens are touched; water, roads, land tan and text keep Esri's own colors.
+      if (h < 55 || h > 170 || s < 0.05) continue;
+      s = Math.min(0.7, s * GREEN_BOOST + 0.14); h = h + (112 - h) * 0.5; l = l * 0.93;
+      var c = hsl2rgb(h, s, l);
+      px[i] = c[0]; px[i + 1] = c[1]; px[i + 2] = c[2];
+    }
+  }
+  var RecolorTerrain = L.GridLayer.extend({
+    createTile: function (coords, done) {
+      var size = this.getTileSize();
+      var tile = L.DomUtil.create("canvas", "leaflet-tile");
+      tile.width = size.x; tile.height = size.y;
+      var url = L.Util.template(SERVICES + "World_Topo_Map/MapServer/tile/{z}/{y}/{x}", coords);
+      function paint(img, canRecolor) {
+        var ctx = tile.getContext("2d");
+        ctx.drawImage(img, 0, 0, size.x, size.y);
+        if (canRecolor) {
+          try {
+            var data = ctx.getImageData(0, 0, size.x, size.y);
+            recolor(data.data);
+            ctx.putImageData(data, 0, 0);
+          } catch (e) { recolorOk = false; applyBaseFilter(); }
+        }
+        done(null, tile);
+      }
+      function load(cors) {
+        var img = new Image();
+        if (cors) img.crossOrigin = "anonymous";
+        img.onload = function () { paint(img, cors); };
+        img.onerror = function () {
+          if (cors) { recolorOk = false; applyBaseFilter(); load(false); } else { done(new Error("tile"), tile); }
+        };
+        img.src = url;
+      }
+      load(true);
+      return tile;
+    }
+  });
+
+  function track(layer) {
+    layer.on("loading", function () { pending++; });
+    layer.on("load", function () { pending = Math.max(0, pending - 1); });
+    return layer;
+  }
+  track(new RecolorTerrain({ pane: "base", maxZoom: 19 })).addTo(map);
+
+  L.marker(HOME, { icon: L.divIcon({ className: "anchor", html: '<div class="home"><i></i><b>' + NAME.replace(/[<>&]/g, "") + '</b></div>', iconSize: [0, 0] }), interactive: false, zIndexOffset: 1000 }).addTo(map);
+
+  function clock(t) { return new Date(t * 1000).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }); }
+  function setStep(el, idx, max) {
+    if (idx >= 0 && idx <= max) { el.href = "#" + idx; el.classList.remove("off"); }
+    else { el.removeAttribute("href"); el.classList.add("off"); }
+  }
+
+  // The hash picks the frame: #0 is the latest, #1 is one step (about 10 minutes) earlier, and so on.
+  function pick(past) {
+    var n = parseInt((window.location.hash || "").replace("#", ""), 10);
+    if (isNaN(n) || n < 0) n = 0;
+    return Math.min(n, past.length - 1);
+  }
+
+  function draw(host, past, scheme) {
+    var n = pick(past), f = past[past.length - 1 - n];
+    var layer = track(L.tileLayer(host + f.path + "/256/{z}/{x}/{y}/" + scheme + "/1_1.png", { opacity: RADAR_OPACITY, maxNativeZoom: 7, maxZoom: 10, zIndex: 400 }));
+    var ok = 0, bad = 0;
+    layer.on("tileload", function () { ok++; });
+    layer.on("tileerror", function () { bad++; if (!ok && bad >= 6 && scheme !== 2) { map.removeLayer(layer); SCHEME = 2; draw(host, past, 2); } });
+    layer.addTo(map);
+    document.querySelector(".legend").style.display = scheme === 6 ? "" : "none";
+    document.getElementById("clock").textContent = clock(f.time);
+    var mins = Math.max(0, Math.round((Date.now() / 1000 - f.time) / 60));
+    document.getElementById("rel").textContent = mins + " min ago";
+    setStep(document.getElementById("older"), n + 1, past.length - 1);
+    setStep(document.getElementById("newer"), n - 1, past.length - 1);
+  }
+
+  fetch(FEED, { cache: "no-store" })
+    .then(function (r) { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); })
+    .then(function (j) {
+      var past = (j.radar && j.radar.past) || [];
+      if (!past.length) throw new Error("no frames");
+      draw(j.host || "https://tilecache.rainviewer.com", past, SCHEME);
+      feedDone = true;
+    })
+    .catch(function (e) { feedDone = true; document.getElementById("rel").textContent = "radar unavailable"; });
+
+  // WidgetWeb hooks: keep waiting while the feed or any map tiles are still loading, but never more than ~8 seconds.
+  window.__wweb2JsWidgetTitle = function () { return "Radar"; };
+  window.__wweb2WaitMillisecondsToWidgetIsReady = function (currentDelayMs) {
+    if (currentDelayMs > 8000) return 0;
+    return (!feedDone || pending > 0) ? 500 : 400;
+  };
+})();
+</script>
+</body>
+</html>
