@@ -40,35 +40,30 @@
     color: var(--ink);
     font: 13px/1.35 var(--font-ui);
     -webkit-font-smoothing: antialiased;
-    padding-block: 14px;
+    padding-block: 10px;
     padding-left: max(16px, env(safe-area-inset-left, 0px));
     padding-right: max(16px, env(safe-area-inset-right, 0px));
   }
   .wrap { max-width: 420px; margin: 0 auto; }
 
   header { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
-  h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.01em; text-wrap: balance; }
+  h1 { margin: 0; font-size: 18px; font-weight: 700; letter-spacing: -0.01em; text-wrap: balance; }
   .today-stamp { font-family: var(--font-num); font-size: 12px; color: var(--ink-muted); white-space: nowrap; }
 
-  .wx { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 10px 0 0; }
-  .wx-card {
-    background: var(--surface-2);
-    border: 1px solid var(--line);
-    border-radius: 10px;
-    padding: 7px 6px 8px;
-    text-align: center;
-  }
-  .wx-day { font-family: var(--font-num); font-size: 10.5px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink-faint); }
-  .wx-icon { width: 24px; height: 24px; color: var(--accent); display: block; margin: 3px auto 3px; }
-  .wx-temp { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .wx { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 8px 0 0; }
+  .wx-card { background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 5px 4px 6px; text-align: center; }
+  .wx-day { font-family: var(--font-num); font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink-faint); }
+  .wx-mid { display: flex; justify-content: center; align-items: center; gap: 4px; margin: 2px 0 1px; }
+  .wx-icon { width: 20px; height: 20px; color: var(--accent); flex: none; }
+  .wx-temp { font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .wx-temp .lo { color: var(--ink-faint); font-weight: 500; }
-  .wx-rain { font-family: var(--font-num); font-size: 10px; color: var(--ink-muted); margin-top: 1px; }
+  .wx-rain { font-family: var(--font-num); font-size: 9.5px; color: var(--ink-muted); }
 
-  .tabs { display: flex; gap: 6px; margin: 10px 0 8px; }
+  .tabs { display: flex; gap: 6px; margin: 8px 0 6px; }
   .tab {
     flex: 1;
     text-align: center;
-    padding: 7px 0;
+    padding: 5px 0;
     border-radius: 100px;
     border: 1px solid var(--line);
     color: var(--ink-muted);
@@ -83,7 +78,7 @@
   .tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
   .list { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; }
-  .row { display: grid; grid-template-columns: 74px minmax(0, 1fr); gap: 10px; padding: 8px 12px; border-top: 1px solid var(--line); }
+  .row { display: grid; grid-template-columns: 74px minmax(0, 1fr); gap: 10px; padding: 6px 12px; border-top: 1px solid var(--line); }
   .row:first-child { border-top: none; }
   .day { font-weight: 700; font-size: 12.5px; }
   .day small { display: block; font-family: var(--font-num); font-weight: 400; font-size: 10.5px; color: var(--ink-faint); }
@@ -94,17 +89,18 @@
   .ev span { overflow-wrap: anywhere; }
   .clear { color: var(--ink-faint); font-style: italic; }
 
-  .irow { padding: 7px 12px 8px; border-top: 1px solid var(--line); }
+  .irow { padding: 5px 12px 6px; border-top: 1px solid var(--line); }
   .irow:first-child { border-top: none; }
   .itop { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
   .iname { font-weight: 700; }
   .idesc { color: var(--ink-faint); font-size: 11px; }
-  .icount { font-family: var(--font-num); font-variant-numeric: tabular-nums; font-size: 16px; font-weight: 500; }
-  .bar { height: 3px; border-radius: 3px; background: var(--accent-soft); margin-top: 5px; overflow: hidden; }
+  .icount { font-family: var(--font-num); font-variant-numeric: tabular-nums; font-size: 14px; font-weight: 500; }
+  .bar { height: 3px; border-radius: 3px; background: var(--accent-soft); margin-top: 4px; overflow: hidden; }
   .bar i { display: block; height: 100%; background: var(--accent); }
   .irow.watch .bar i { background: var(--warn); }
 
-  .stamp { margin-top: 8px; font-size: 10.5px; color: var(--ink-faint); font-family: var(--font-num); display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+  .stamp.off { display: none; }
+  .stamp { margin-top: 6px; padding-right: 40px; font-size: 10px; color: var(--ink-faint); font-family: var(--font-num); display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 </style>
 
 <div class="wrap">
@@ -251,8 +247,8 @@
       var temp = w ? Math.round(w.hi) + '° <span class="lo">/ ' + Math.round(w.lo) + '°</span>' : '—° <span class="lo">/ —°</span>';
       var rain = w ? w.p + '% rain' : '— rain';
       html += '<div class="wx-card"><div class="wx-day">' + label + '</div>' +
-        '<svg class="wx-icon"><use href="#i-' + icon + '"></use></svg>' +
-        '<div class="wx-temp">' + temp + '</div><div class="wx-rain">' + rain + '</div></div>';
+        '<div class="wx-mid"><svg class="wx-icon"><use href="#i-' + icon + '"></use></svg>' +
+        '<div class="wx-temp">' + temp + '</div></div><div class="wx-rain">' + rain + '</div></div>';
     }
     document.getElementById("wx").innerHTML = html;
     document.getElementById("wxNote").textContent = wxLive ? "Forecast live" : "Forecast as of " + WX_SNAPSHOT_DATE;
@@ -281,11 +277,11 @@
   }
 
   /* ---------- schedule / inbox ---------- */
-  function renderSchedule() {
+  function renderSchedule(n) {
     var rows = [{ k: todayKey, ev: eventsOn(todayKey), today: true }];
     var keys = [];
     EVENTS.forEach(function (e) { if (e.d > todayKey && keys.indexOf(e.d) < 0) keys.push(e.d); });
-    keys.slice(0, 3).forEach(function (k) { rows.push({ k: k, ev: eventsOn(k), today: false }); });
+    keys.slice(0, n).forEach(function (k) { rows.push({ k: k, ev: eventsOn(k), today: false }); });
     return rows.map(function (r) {
       var body = r.ev.length
         ? r.ev.map(function (e) { return '<div class="ev"><time>' + e.t + '</time><span>' + e.w + '</span></div>'; }).join("")
@@ -314,9 +310,23 @@
     } catch (e) { return ""; }
   }
 
+  function overflows() { return document.documentElement.scrollHeight > window.innerHeight + 1; }
+
   function setView(name) {
     if (name !== "inbox") name = "schedule";
-    document.getElementById("view").innerHTML = name === "inbox" ? renderInbox() : renderSchedule();
+    var view = document.getElementById("view");
+    var stamp = document.querySelector(".stamp");
+    stamp.classList.remove("off");
+    if (name === "inbox") {
+      view.innerHTML = renderInbox();
+    } else {
+      // Show as many upcoming days as the widget height allows.
+      for (var n = 3; n >= 1; n--) {
+        view.innerHTML = renderSchedule(n);
+        if (!overflows()) break;
+      }
+    }
+    if (overflows()) stamp.classList.add("off");
     ["schedule", "inbox"].forEach(function (n) {
       var tab = document.getElementById("tab-" + n);
       if (n === name) tab.setAttribute("aria-current", "page"); else tab.removeAttribute("aria-current");
@@ -333,8 +343,8 @@
   });
 
   var hash = (window.location.hash || "").replace("#", "");
-  setView(hash === "inbox" || hash === "schedule" ? hash : (getCookie("hb_view") || "schedule"));
   renderWx();
+  setView(hash === "inbox" || hash === "schedule" ? hash : (getCookie("hb_view") || "schedule"));
   loadLiveWeather();
 
   document.getElementById("todayStamp").textContent = DAYS[now.getDay()] + " " + MONTHS[now.getMonth()] + " " + now.getDate();
