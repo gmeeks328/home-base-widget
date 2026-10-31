@@ -270,9 +270,12 @@
     for (var i = 0; i < px.length; i += 4) {
       if (px[i + 3] === 0) continue;
       var hsl = rgb2hsl(px[i], px[i + 1], px[i + 2]), h = hsl[0], s = hsl[1], l = hsl[2];
-      if (h >= 185 && h <= 260 && s > 0.06) { h = 208; s = Math.min(0.65, s * 2.6 + 0.3); l = l * 0.9; }        // water
-      else if (h >= 60 && h < 185 && s > 0.05) { h = 112; s = Math.min(0.5, s * 2.2 + 0.2); l = l * 0.9; }   // vegetation
-      else { h = 32; s = Math.min(0.5, s * 2.2 + 0.12); l = l * 0.98; }                                       // bare land
+      if (h >= 125 && h <= 265 && s > 0.03) { h = 208; s = Math.min(0.7, s * 2.6 + 0.35); l = l * 0.9; }   // water (incl. teal-gray ocean)
+      else {
+        // land: low saturation reads as dry ground (brown), higher saturation as vegetation (green)
+        var t = Math.max(0, Math.min(1, (s - 0.07) / 0.18)); if (l < 0.62) t = Math.max(t, 0.7);
+        h = 30 + 80 * t; s = 0.30 + 0.25 * t; l = l * (0.97 - 0.07 * t);
+      }
       var c = hsl2rgb(h, s, l);
       px[i] = c[0]; px[i + 1] = c[1]; px[i + 2] = c[2];
     }
