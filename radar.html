@@ -248,7 +248,7 @@
 
   // ---- terrain recoloring: water to blue, vegetation to green, bare land to brown, keeping the relief shading ----
   var recolorOk = true;
-  var GREEN_BOOST = 2.2;   // raise for richer greens, lower for paler
+  var GREEN_BOOST = 3.4;   // raise for richer greens, lower for paler
   function rgb2hsl(r, g, b) {
     r /= 255; g /= 255; b /= 255;
     var mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2, h = 0, s = 0, d = mx - mn;
@@ -274,7 +274,7 @@
       var hsl = rgb2hsl(px[i], px[i + 1], px[i + 2]), h = hsl[0], s = hsl[1], l = hsl[2];
       // Only vegetation greens are touched; water, roads, land tan and text keep Esri's own colors.
       if (h < 55 || h > 170 || s < 0.05) continue;
-      s = Math.min(0.6, s * GREEN_BOOST + 0.04); h = h + (112 - h) * 0.45; l = l * 0.97;
+      s = Math.min(0.7, s * GREEN_BOOST + 0.14); h = h + (112 - h) * 0.5; l = l * 0.93;
       var c = hsl2rgb(h, s, l);
       px[i] = c[0]; px[i + 1] = c[1]; px[i + 2] = c[2];
     }
