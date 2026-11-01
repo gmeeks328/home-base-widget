@@ -286,7 +286,28 @@
 
   /* ---------- weather ---------- */
   var wxLive = false;
-  var wxPending = false;
+  var wxPending = false;     // a forecast request is in flight
+  var wxBlocking = false;    // ...and the widget should wait for it (only when there is nothing cached to show)
+  var wxStamp = "";          // clock time of the cached forecast, for the footer
+  var WX_CACHE_KEY = "hb_wx";
+
+  // Last good live forecast, kept for 6 hours. It makes the widget ready instantly; a fresh fetch still runs behind it and updates the cache for next time.
+  function readWxCache() {
+    try {
+      var raw = null;
+      try { raw = window.localStorage.getItem(WX_CACHE_KEY); } catch (e) {}
+      if (!raw) { var c = getCookie(WX_CACHE_KEY); raw = c ? decodeURIComponent(c) : null; }
+      if (!raw) return null;
+      var o = JSON.parse(raw);
+      if (!o || !o.t || !o.d || Date.now() - o.t > 6 * 3600 * 1000 || !o.d[todayKey]) return null;
+      return o;
+    } catch (e) { return null; }
+  }
+  function writeWxCache(d) {
+    var raw = JSON.stringify({ t: Date.now(), d: d });
+    try { window.localStorage.setItem(WX_CACHE_KEY, raw); } catch (e) {}
+    setCookie(WX_CACHE_KEY, encodeURIComponent(raw));
+  }
 
   function codeToIcon(c) {
     if (c === 0) return "sun";
@@ -318,7 +339,7 @@
     }
     html += '</div></div>';
     document.getElementById("wx").innerHTML = html;
-    document.getElementById("wxNote").textContent = wxLive ? "Forecast live" : "Forecast " + WX_SNAPSHOT_DATE;
+    document.getElementById("wxNote").textContent = wxLive ? "Forecast live" : (wxStamp ? "Forecast " + wxStamp : "Forecast " + WX_SNAPSHOT_DATE);
   }
 
   // Live refresh. Works where the page may call the network (for example hosted on GitHub Pages);
@@ -327,8 +348,9 @@
     if (!window.fetch) return;
     wxPending = true;
     var ctrl = window.AbortController ? new AbortController() : null;
-    var timer = setTimeout(function () { if (ctrl) ctrl.abort(); wxPending = false; }, 2500);
-    fetch(WX_LIVE_URL, ctrl ? { signal: ctrl.signal } : undefined)
+    // With a cached forecast on screen nothing waits on this request, so it can take its time; otherwise give up quickly and keep the snapshot.
+    var timer = setTimeout(function () { if (ctrl) ctrl.abort(); wxPending = false; wxBlocking = false; }, wxBlocking ? 1500 : 3000);
+    fetch(WX_LIVE_URL, ctrl ? { signal: ctrl.signal, priority: "high" } : { priority: "high" })
       .then(function (r) { return r.json(); })
       .then(function (j) {
         var d = j.daily, fresh = {};
@@ -337,6 +359,7 @@
         }
         WX = fresh;
         wxLive = true;
+        writeWxCache(fresh);
         renderWx();
         // The footer text just changed, so fit the schedule again; more rows may now fit.
         var cur = document.getElementById("tab-schedule");
@@ -348,7 +371,7 @@
         }
       })
       .catch(function () {})
-      .then(function () { clearTimeout(timer); wxPending = false; });
+      .then(function () { clearTimeout(timer); wxPending = false; wxBlocking = false; });
   }
 
   /* ---------- schedule / inbox ---------- */
@@ -489,7 +512,7 @@
   function startRadarMap() {
     var L = window.L;
     if (RADAR.map) { try { RADAR.map.remove(); } catch (e) {} RADAR.map = null; }
-    var map = L.map("rmap", { center: RADAR.home, zoom: RADAR.zoom, zoomControl: false, attributionControl: false, dragging: false, touchZoom: false, scrollWheelZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false });
+    var map = L.map("rmap", { center: RADAR.home, zoom: RADAR.zoom, zoomControl: false, attributionControl: false, dragging: false, touchZoom: false, scrollWheelZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false, fadeAnimation: false, zoomAnimation: false, markerZoomAnimation: false, inertia: false });
     RADAR.map = map;
     map.createPane("base").style.zIndex = 150;
     map.createPane("radar").style.zIndex = 400;
@@ -599,12 +622,19 @@
 
   var hash = (window.location.hash || "").replace("#", "");
   // On the Radar tab, get Leaflet, the radar feed and the connections moving before anything else runs.
-  if (/^radar\d*$/.test(hash)) prefetchRadar();
-  renderWx();
-  setView(hash === "inbox" || hash === "schedule" || /^radar\d*$/.test(hash) ? hash : (getCookie("hb_view") || "schedule"));
-  window.addEventListener("hashchange", function () { var h = (window.location.hash || "").replace("#", ""); if (/^radar\d*$/.test(h)) setView(h); });
+  var onRadar = /^radar\d*$/.test(hash);
+  if (onRadar) prefetchRadar();
+  // Use the cached forecast if there is one (instant), and start the live request before any rendering so it overlaps with it.
+  var cachedWx = onRadar ? null : readWxCache();
+  if (cachedWx) {
+    WX = cachedWx.d;
+    wxStamp = new Date(cachedWx.t).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  }
   // The forecast is not shown on the Radar tab, so skip that request there.
-  if (!/^radar\d*$/.test(hash)) loadLiveWeather();
+  if (!onRadar) { wxBlocking = !cachedWx; loadLiveWeather(); }
+  renderWx();
+  setView(hash === "inbox" || hash === "schedule" || onRadar ? hash : (getCookie("hb_view") || "schedule"));
+  window.addEventListener("hashchange", function () { var h = (window.location.hash || "").replace("#", ""); if (/^radar\d*$/.test(h)) setView(h); });
 
   document.getElementById("todayStamp").textContent = DAYS[now.getDay()] + " " + MONTHS[now.getMonth()] + " " + now.getDate();
   if (todayKey > DATA_THROUGH) document.getElementById("wxNote").textContent = "Data is out of date";
@@ -615,8 +645,8 @@
   // Return 0 as soon as the page is ready; any other number means "check again in that many ms".
   var PAGE_T0 = Date.now();
   function __wweb2WaitMillisecondsToWidgetIsReady(currentDelayMs) {
-    if (Date.now() - PAGE_T0 > 12000) return 0;
-    if (document.body.classList.contains("radar")) return (radarPending || RADAR.pending > 0) ? 250 : 0;
-    return wxPending ? 150 : 0;
+    if (Date.now() - PAGE_T0 > 7000) return 0;
+    if (document.body.classList.contains("radar")) return (radarPending || RADAR.pending > 0) ? 60 : 0;
+    return (wxPending && wxBlocking) ? 50 : 0;
   }
 </script>

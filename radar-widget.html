@@ -56,7 +56,7 @@
   var SCHEME = 6, RADAR_OPACITY = 0.85;
   var pending = 0, feedDone = false;
 
-  var map = L.map("map", { center: HOME, zoom: ZOOM, zoomControl: false, attributionControl: false, dragging: false, touchZoom: false, scrollWheelZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false });
+  var map = L.map("map", { center: HOME, zoom: ZOOM, zoomControl: false, attributionControl: false, dragging: false, touchZoom: false, scrollWheelZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false, fadeAnimation: false, zoomAnimation: false, markerZoomAnimation: false, inertia: false });
   map.createPane("base").style.zIndex = 150;
   document.getElementById("chip").textContent = "Radar \u00b7 " + NAME;
 
@@ -179,8 +179,8 @@
   window.__wweb2JsWidgetTitle = function () { return "Radar"; };
   var T0 = Date.now();
   window.__wweb2WaitMillisecondsToWidgetIsReady = function () {
-    if (Date.now() - T0 > 12000) return 0;   // WidgetWeb always passes 0, so track the cap here
-    return (!feedDone || pending > 0) ? 500 : 0;
+    if (Date.now() - T0 > 7000) return 0;   // WidgetWeb always passes 0, so track the cap here
+    return (!feedDone || pending > 0) ? 60 : 0;
   };
 })();
 </script>
