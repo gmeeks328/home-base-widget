@@ -387,7 +387,8 @@
 
   // The widget shows about 365pt of height; the page viewport can be taller, so measure against the smaller of the two.
   var WIDGET_H = 365;
-  function overflows() { return document.getElementById("view").getBoundingClientRect().bottom + (document.querySelector(".stamp").offsetHeight || 0) + 8 > Math.min(window.innerHeight, WIDGET_H) + 1; }
+  function availH() { var h = window.innerHeight || WIDGET_H; return h < 340 ? 350 : Math.min(h, WIDGET_H); }
+  function overflows() { return document.getElementById("view").getBoundingClientRect().bottom + (document.querySelector(".stamp").offsetHeight || 0) + 8 > availH() + 1; }
 
 
   // ---- Radar tab (same map as radar-widget.html: Esri topographic with boosted greens, RainViewer radar, hash picks the frame) ----
