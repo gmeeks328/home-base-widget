@@ -1,4 +1,4 @@
-# Home Base widget: handoff (Oct 31, 2026)
+# Home Base widget: handoff (updated Oct 31, 2026, late evening)
 
 Repo: `gmeeks328/home-base-widget`, served by GitHub Pages at `https://gmeeks328.github.io/home-base-widget/`. Push to `main` to deploy (live in about a minute, sometimes up to 10).
 
@@ -16,7 +16,10 @@ Repo: `gmeeks328/home-base-widget`, served by GitHub Pages at `https://gmeeks328
 - Taps on `<a href="#name">` reload the page with that hash. WidgetWeb's cache ignores the hash, so the page reads `location.hash` itself. Tabs are `#schedule`, `#inbox`, `#radar`; radar frames are `#radar` (latest), `#radar1`, `#radar2`... (each step is about 10 minutes earlier).
 - The page must define `__wweb2WaitMillisecondsToWidgetIsReady`. It is called repeatedly and ALWAYS receives `currentDelayMs=0`, so any time cap must be tracked inside the page. Return `0` when ready; any other number means "ask again in that many ms". (A version that always returned 400 made the Radar tab hang for the full ~30 s limit.)
 - WidgetWeb keeps a saved copy of the page. After a push: set the widget URL to `.../home-base-widget/?v=N` (bump N), tap Update in the app, then refresh the widget. The Reload button on the widget fetches fresh.
-- The widget's visible area is about 350 x 365 pt (1,050 x 1,095 px). The page viewport can be taller, so layout code caps at `WIDGET_H = 365`.
+- The widget's visible area is about 394 x 390 pt on Garrett's phone (measured from the WidgetWeb log button rects plus a screenshot). Layout code caps height at `WIDGET_H = 385`; `availH()` falls back to 380 if the page reports an odd viewport under 340. The old 365 cap is why the schedule kept showing only 4 rows. A schedule row is about 38 pt.
+- In dark mode WidgetWeb forces every `background-color` to black and text to white. `background-image` fills survive, so key fills use `background-image: linear-gradient(var(--x), var(--x))`. Dark colors are tokens in `:root` plus two duplicated dark blocks (media query and `data-theme="dark"`).
+- In-page links cannot open other apps (WidgetWeb loads the href as the widget page). All app-launch links were removed. The only way is WidgetWeb's per-widget "Action #2" URL setting (an iOS URL scheme, one per widget), which Garrett sets in the app himself.
+- Schedule rows are auto-fitted: `fitSchedule()` renders 5 upcoming days, then trims while `overflows()` is true. After live weather arrives it re-fits.
 - iOS widgets get about 30 MB memory. Tile layers use `keepBuffer: 0` to stay light.
 - The in-app log is at `http://127.0.0.1:18080/WWebWidgetExt_applog.txt` (on the phone).
 
@@ -35,7 +38,9 @@ Repo: `gmeeks328/home-base-widget`, served by GitHub Pages at `https://gmeeks328
 
 ## Open items
 
+- Done Oct 31: redesign, speedups (lazy Leaflet, parallel prefetch), dark-mode fix, radar polish (seam, blotches, label box), links removed, schedule shows more rows (user said it looks fixed after `?v=9`).
 - Check Nov 1 morning that the scheduled run pushed (look for a "Daily data refresh" commit) and that the widget's "Updated" time moved.
+- Optional: set WidgetWeb Action #2 to an app URL scheme (for example a calendar app) for tap-to-open; unverified which scheme works.
 - Optional: raise radar opacity so rain stands out (`RADAR_OPACITY`, currently 0.85).
 - Optional: Tomorrow.io as the widget's weather source instead of Open-Meteo.
 - Dead code: `radar.html` still contains unused terrain-classification leftovers from earlier color experiments; harmless.
