@@ -127,7 +127,7 @@
   .irow.watch .icount { color: var(--warn); }
 
   .stamp.off { display: none; }
-  .stamp { margin-top: 6px; padding: 0 40px 0 4px; font-size: 10px; color: var(--ink-faint); font-family: var(--font-num); display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+  .stamp { margin-top: 6px; padding: 0 40px 0 4px; font-size: 10px; color: var(--ink-faint); font-family: var(--font-num); display: flex; justify-content: space-between; gap: 8px; white-space: nowrap; }
 
   /* Radar tab: hides the forecast hero and timestamp so the map gets the room. Leaflet is loaded only when this tab is opened. */
   body.radar .wx, body.radar .stamp { display: none; }
@@ -318,7 +318,7 @@
     }
     html += '</div></div>';
     document.getElementById("wx").innerHTML = html;
-    document.getElementById("wxNote").textContent = wxLive ? "Forecast live" : "Forecast as of " + WX_SNAPSHOT_DATE;
+    document.getElementById("wxNote").textContent = wxLive ? "Forecast live" : "Forecast " + WX_SNAPSHOT_DATE;
   }
 
   // Live refresh. Works where the page may call the network (for example hosted on GitHub Pages);
@@ -338,6 +338,14 @@
         WX = fresh;
         wxLive = true;
         renderWx();
+        // The footer text just changed, so fit the schedule again; more rows may now fit.
+        var cur = document.getElementById("tab-schedule");
+        if (cur && cur.getAttribute("aria-current") === "page") {
+          var st = document.querySelector(".stamp");
+          st.classList.remove("off");
+          fitSchedule();
+          if (overflows()) st.classList.add("off");
+        }
       })
       .catch(function () {})
       .then(function () { clearTimeout(timer); wxPending = false; });
@@ -379,7 +387,7 @@
 
   // The widget shows about 365pt of height; the page viewport can be taller, so measure against the smaller of the two.
   var WIDGET_H = 365;
-  function overflows() { return document.getElementById("view").getBoundingClientRect().bottom + (document.querySelector(".stamp").offsetHeight || 0) + 12 > Math.min(window.innerHeight, WIDGET_H) + 1; }
+  function overflows() { return document.getElementById("view").getBoundingClientRect().bottom + (document.querySelector(".stamp").offsetHeight || 0) + 8 > Math.min(window.innerHeight, WIDGET_H) + 1; }
 
 
   // ---- Radar tab (same map as radar-widget.html: Esri topographic with boosted greens, RainViewer radar, hash picks the frame) ----
@@ -551,6 +559,13 @@
       .catch(function () { var r = document.getElementById("rRel"); if (r) r.textContent = "radar unavailable"; radarPending = false; });
   }
 
+  // Render the longest list once, then trim rows from the bottom until it fits the widget height (always keeps today + 1).
+  function fitSchedule() {
+    var view = document.getElementById("view");
+    view.innerHTML = renderSchedule(5);
+    while (view.children.length > 2 && overflows()) view.removeChild(view.lastElementChild);
+  }
+
   function setView(name) {
     var isRadar = /^radar\d*$/.test(name);
     if (isRadar) name = "radar"; else if (name !== "inbox") name = "schedule";
@@ -563,9 +578,7 @@
     } else if (name === "inbox") {
       view.innerHTML = renderInbox();
     } else {
-      // Render the longest list once, then trim rows from the bottom until it fits the widget height (always keeps today + 1).
-      view.innerHTML = renderSchedule(5);
-      while (view.children.length > 2 && overflows()) view.removeChild(view.lastElementChild);
+      fitSchedule();
     }
     if (!isRadar && overflows()) stamp.classList.add("off");
     ["schedule", "inbox", "radar"].forEach(function (n) {
