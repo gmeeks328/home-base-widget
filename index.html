@@ -135,9 +135,14 @@
   .rwrap { position: relative; border-radius: 18px; overflow: hidden; border: 1px solid var(--line); background: var(--surface-2); background-image: linear-gradient(var(--surface-2), var(--surface-2)); box-shadow: var(--shadow); }
   .rmap { position: absolute; inset: 0; }
   .rwrap .anchor { background: none; border: none; }
-  .rhome { position: absolute; left: 0; top: 0; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 3px; }
-  .rhome i { display: block; width: 13px; height: 13px; border-radius: 50%; background: var(--blue); background-image: linear-gradient(var(--blue), var(--blue)); border: 3px solid #fff; box-shadow: 0 0 0 1.5px #2F6FD0, 0 2px 6px rgba(0,0,0,0.25); }
-  .rhome b { padding: 1px 7px; border-radius: 8px; background: var(--blue); background-image: linear-gradient(var(--blue), var(--blue)); color: #fff; font-size: 10.5px; font-weight: 700; white-space: nowrap; }
+  /* Leaflet's default light-gray background can peek through a 1-2px seam at the map edge; paint it with the theme color instead. */
+  .rwrap .leaflet-container { background: var(--surface-2); background-image: linear-gradient(var(--surface-2), var(--surface-2)); }
+  /* The dot and label are positioned straight inside the marker (no wrapper box), so WidgetWeb's dark mode has no container to paint black. */
+  .rhome { display: contents; }
+  /* Radar tiles only exist up to zoom 7 and the map is at 8, so soften the stretched pixel blocks. */
+  .leaflet-radar-pane { filter: blur(1.4px); }
+  .rhome i { position: absolute; left: 0; top: 0; transform: translate(-50%, -50%); display: block; width: 13px; height: 13px; border-radius: 50%; background: var(--blue); background-image: linear-gradient(var(--blue), var(--blue)); border: 3px solid #fff; box-shadow: 0 0 0 1.5px #2F6FD0, 0 2px 6px rgba(0,0,0,0.25); }
+  .rhome b { position: absolute; left: 0; top: 11px; transform: translateX(-50%); padding: 1px 7px; border-radius: 8px; background: var(--blue); background-image: linear-gradient(var(--blue), var(--blue)); color: #fff; font-size: 10.5px; font-weight: 700; white-space: nowrap; }
   .rlegend { position: absolute; z-index: 800; top: 7px; right: 7px; padding: 3px 7px; border-radius: 100px; background: var(--ctl-bg); background-image: linear-gradient(var(--ctl-bg), var(--ctl-bg)); border: 1px solid var(--ctl-line); font-size: 9.5px; color: var(--ctl-sub); display: flex; align-items: center; gap: 4px; }
   .rlegend i { display: block; width: 38px; height: 5px; border-radius: 3px; background: linear-gradient(90deg, #3aa845, #f0e030, #f08020, #d02020, #b020a0); }
   .rbar { position: absolute; z-index: 800; left: 7px; right: 7px; bottom: 7px; display: flex; align-items: center; gap: 6px; padding: 4px; border-radius: 100px; background: var(--ctl-bg); background-image: linear-gradient(var(--ctl-bg), var(--ctl-bg)); border: 1px solid var(--ctl-line); color: var(--ctl-ink); }
@@ -478,6 +483,8 @@
     var map = L.map("rmap", { center: RADAR.home, zoom: RADAR.zoom, zoomControl: false, attributionControl: false, dragging: false, touchZoom: false, scrollWheelZoom: false, doubleClickZoom: false, boxZoom: false, keyboard: false });
     RADAR.map = map;
     map.createPane("base").style.zIndex = 150;
+    map.createPane("radar").style.zIndex = 400;
+    setTimeout(function () { try { map.invalidateSize(false); } catch (e) {} }, 0);
     var SERVICES = "https://server.arcgisonline.com/ArcGIS/rest/services/";
     function applyBaseFilter() { map.getPane("base").style.filter = recolorOk ? "none" : "saturate(1.25)"; }
 
@@ -527,7 +534,7 @@
     }
     function draw(past, host, scheme) {
       var n = Math.min(radarFrame(), past.length - 1), f = past[past.length - 1 - n];
-      var layer = track(L.tileLayer(host + f.path + "/256/{z}/{x}/{y}/" + scheme + "/1_1.png", { opacity: 0.85, maxNativeZoom: 7, maxZoom: 10, zIndex: 400, keepBuffer: 0, updateWhenIdle: true }));
+      var layer = track(L.tileLayer(host + f.path + "/256/{z}/{x}/{y}/" + scheme + "/1_1.png", { opacity: 0.85, maxNativeZoom: 7, maxZoom: 10, pane: "radar", keepBuffer: 0, updateWhenIdle: true }));
       var ok = 0, bad = 0;
       layer.on("tileload", function () { ok++; });
       layer.on("tileerror", function () { bad++; if (!ok && bad >= 6 && scheme !== 2) { map.removeLayer(layer); draw(past, host, 2); } });
