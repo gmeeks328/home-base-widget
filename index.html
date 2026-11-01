@@ -97,13 +97,6 @@
   .list { background: var(--surface); border: 1px solid var(--line); border-radius: 18px; box-shadow: var(--shadow); overflow: hidden; }
 
   /* Schedule rows: date chip + events with a colored dot per kind */
-  /* Rows, inbox lines and the weather card are links; the --wweb2 vars make them tappable regions in WidgetWeb. */
-  a.row, a.irow, a.hero { color: inherit; text-decoration: none; -webkit-tap-highlight-color: transparent;
-    --wweb2-overlay-btn-color: rgba(0, 0, 0, 0);
-    --wweb2-overlay-btn-press-color: rgba(47, 110, 98, 0.18);
-    --wweb2-overlay-btn-corner-radius: 0px; }
-  a.hero { --wweb2-overlay-btn-corner-radius: 18px; }
-  a.row:focus-visible, a.irow:focus-visible, a.hero:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
   .row { display: grid; grid-template-columns: 50px minmax(0, 1fr); gap: 10px; align-items: center; padding: 4px 10px; border-top: 1px solid var(--line); }
   .row:first-child { border-top: none; }
   .chip { height: 30px; border-radius: 9px; background: var(--surface-2); display: flex; flex-direction: column; align-items: center; justify-content: center; }
@@ -119,7 +112,7 @@
   .ev span { font-weight: 600; overflow-wrap: anywhere; }
   .clear { color: var(--ink-faint); font-style: italic; }
 
-  .irow { display: block; padding: 5px 12px 6px; border-top: 1px solid var(--line); }
+  .irow { padding: 5px 12px 6px; border-top: 1px solid var(--line); }
   .irow:first-child { border-top: none; }
   .itop { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
   .iname { font-weight: 700; }
@@ -261,16 +254,6 @@
   var DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   var MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-  // Where each tap goes. Change these in one place if a link opens the wrong app.
-  var GMAIL_LABELS = { "Finance": "my-finance", "Bills": "my-bills", "Daycare": "daycare", "Security": "my-security", "Personal": "personal" };
-  var LINKS = {
-    // Google Calendar, day view for the tapped date
-    day: function (k) { var p = k.split("-"); return "https://calendar.google.com/calendar/r/day/" + (+p[0]) + "/" + (+p[1]) + "/" + (+p[2]); },
-    // Gmail, unread mail in that label
-    mail: function (name) { return "https://mail.google.com/mail/u/0/#search/label%3A" + (GMAIL_LABELS[name] || "inbox") + "+is%3Aunread"; },
-    weather: "weather://"
-  };
-
   function pad(n) { return n < 10 ? "0" + n : "" + n; }
   function keyOf(dt) { return dt.getFullYear() + "-" + pad(dt.getMonth() + 1) + "-" + pad(dt.getDate()); }
   function fromKey(k) { var p = k.split("-"); return new Date(+p[0], +p[1] - 1, +p[2]); }
@@ -316,7 +299,7 @@
 
   function renderWx() {
     var t = wxFor(0), main = t.w;
-    var html = '<a class="hero" href="' + LINKS.weather + '"><div class="hero-main"><svg class="hero-icon"><use href="#i-' + t.icon + '"></use></svg>' +
+    var html = '<div class="hero"><div class="hero-main"><svg class="hero-icon"><use href="#i-' + t.icon + '"></use></svg>' +
       '<div><div class="hero-eyebrow">Today’s high</div><div class="hero-temp">' + (main ? Math.round(main.hi) : "—") + '°</div>' +
       '<div class="hero-sub">Low ' + (main ? Math.round(main.lo) : "—") + '° · ' + (main ? main.p : "—") + '% rain</div></div></div><div class="hero-next">';
     for (var i = 1; i < 3; i++) {
@@ -325,7 +308,7 @@
         '<div class="nx-t">' + (w ? Math.round(w.hi) : "—") + '° <span class="lo">' + (w ? Math.round(w.lo) : "—") + '°</span></div>' +
         '<div class="nx-r">' + (w ? w.p : "—") + '%</div></div>';
     }
-    html += '</div></a>';
+    html += '</div></div>';
     document.getElementById("wx").innerHTML = html;
     document.getElementById("wxNote").textContent = wxLive ? "Forecast live" : "Forecast as of " + WX_SNAPSHOT_DATE;
   }
@@ -362,7 +345,7 @@
       var body = r.ev.length
         ? r.ev.map(function (e) { return '<div class="ev" style="--tone:' + tone(e.w) + '"><i></i><time>' + e.t + '</time><span>' + e.w + '</span></div>'; }).join("")
         : '<div class="clear">Nothing on the calendar</div>';
-      return '<a class="row' + (r.today ? ' is-today' : '') + '" href="' + LINKS.day(r.k) + '">' + chip(r.k) + '<div>' + body + '</div></a>';
+      return '<div class="row' + (r.today ? ' is-today' : '') + '">' + chip(r.k) + '<div>' + body + '</div></div>';
     }).join("");
   }
 
@@ -370,9 +353,9 @@
     var max = Math.max.apply(null, INBOX.map(function (r) { return r[2]; }));
     return INBOX.map(function (r) {
       var pct = Math.max(3, Math.round(r[2] / max * 100));
-      return '<a class="irow' + (r[3] ? ' watch' : '') + '" href="' + LINKS.mail(r[0]) + '"><div class="itop"><div><span class="iname">' + r[0] +
+      return '<div class="irow' + (r[3] ? ' watch' : '') + '"><div class="itop"><div><span class="iname">' + r[0] +
         '</span> <span class="idesc">' + r[1] + '</span></div><div class="icount">' + r[2] +
-        '</div></div><div class="bar"><i style="width:' + pct + '%"></i></div></a>';
+        '</div></div><div class="bar"><i style="width:' + pct + '%"></i></div></div>';
     }).join("");
   }
 
